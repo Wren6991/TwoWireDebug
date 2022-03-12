@@ -76,34 +76,11 @@ A command byte consists of:
 
 The DTM uses the start bit to detect the beginning of the command. Consequently, the host can issue any number of idle clocks on DCK, with DIO driven low, and this will not initiate a command.
 
-The command code specifies what operation the host is requesting, and therefore the direction and number of payload bytes. The four command bits are protected by an _odd_ parity bit (an XOR reduction).
+The command code specifies what operation the host is requesting, and therefore the direction and number of payload bytes. The listing can be found in <<command-listing>>. The four command bits are protected by an _odd_ parity bit.
 
 The two turnaround cycles give time for the bus direction to be reversed during a read command. (See <<bus-tristating>>.) On write commands, the host drives DIO low for these two cycles, and on read commands, the host tristates its DIO output for these two cycles, and then continues tristating for the duration of the payload and parity bytes. The command codes are chosen such that the parity bit is always 0 for a read command, thus parking the line before the turnaround.
 
 The DTM responds to a command parity failure by setting the write parity error bit in the CSR (TODO) and entering the Disconnected link state (<<connected-and-disconnected>>).
-
-
-[[command-listing]]
-==== Command Listing
-
-Summary of commands:
-
-[%autowidth.stretch, options="header"]
-|===
-| Opcode | Instruction name | Description | Payload
-
-|`0x1` |`R.ID`      | Read ID register                                   | 4 bytes read
-|`0x2` |`R.CSR`     | Read control/status register                       | 4 bytes read
-|`0x3` |`W.CSR`     | Write control/status register                      | 4 bytes write
-|`0x4` |`R.ADDR`    | Read address register                              | 1-8 bytes read
-|`0x5` |`W.ADDR`    | Write address register                             | 1-8 bytes write
-|`0x7` |`R.DATA`    | Perform bus read, and get result of last `R.DATA`  | 4 bytes read
-|`0x8` |`R.BUFF`    | Get result of last `R.DATA`                        | 4 bytes read
-|`0x9` |`W.DATA`    | Perform bus write                                  | 4 bytes write
-|`0xf` |`DISCONNECT`| Enter the Disconnected state                       | None
-|Others|Reserved    | Host should never issue. Target should Disconnect. |
-
-|===
 
 
 === Parity Bytes
@@ -117,15 +94,28 @@ image::img/parity_byte_fmt.png[pdfwidth=100%,align=center]
 
 The parity byte consists of:
 
-* Four parity bits: P3, P2, P1, P0
-** P3 is the XOR reduction of bits 7 and 3 of all payload bytes
-** P2 is the XOR reduction of bits 6 and 2 of all payload bytes
-** P1 is the XOR reduction of bits 5 and 1 of all payload bytes
-** P0 is the XOR reduction of bits 4 and 0 of all payload bytes
+* Four odd parity bits: P3, P2, P1, P0
+** P3 is the negation of the XOR reduction of bits 7 and 3 of all payload bytes
+** P2 is the negation of the XOR reduction of bits 6 and 2 of all payload bytes
+** P1 is the negation of the XOR reduction of bits 5 and 1 of all payload bytes
+** P0 is the negation of the XOR reduction of bits 4 and 0 of all payload bytes
 * Two zero bits
 * Two turnaround bits
 
+
 The turnaround cycles provide a gap between the target driving data during a read command, and the beginning of the next command byte. See <<bus-tristating>>
+
+Software can calculate the parity bits as such:
+
+[source,python]
+----
+# Python
+def parity(payload_bytes):
+	accum = 0
+	for byte in payload_bytes:
+		accum ^= ((byte >> 4) ^ byte) & 0xf
+	return ~accum & 0xf
+----
 
 [[connected-and-disconnected]]
 === Connected and Disconnected States
@@ -163,8 +153,6 @@ The DTM may encounter errors due to some issue on the downstream bus, or an ille
 The <<dtm-chapter>> chapter goes into more detail about why these errors happen, and how the host can respond.
 
 As long as there are no command or write payload parity errors, the DTM remains in the Connected state, and continues to decode incoming commands.
-
-Since hosts will often batch up commands, a recommended pattern is to append a `CSR.R` to the end of each batch to pick up the accumulated errors.
 
 [[multidrop]]
 === Multidrop
@@ -222,4 +210,146 @@ If this method is used, the host should drive 0s at the point where it ought to 
 [[dtm-chapter]]
 == Debug Transfer Module
 
-fooble
+A Debug Transfer Module (DTM) is a bridge between an TWD serial bus, and an internal address-mapped bus. Its internal state consists primarily of:
+
+* A control and status register (<<reg-csr>>) 32 bits in size
+* An address register (<<reg-addr>>), 8 to 64 bits in size
+* A bus data buffer, 32 bits in size
+
+[[command-listing]]
+=== Command Listing
+
+Summary of commands:
+
+[%autowidth.stretch, options="header"]
+|===
+| Opcode | Command | Brief | Payload
+
+|`0x0` |<<cmd-disconnect>>| Enter the Disconnected state                       | None
+|`0x1` |<<cmd-r.idcode>>  | Read device identifier                             | 4 bytes read
+|`0x2` |<<cmd-r.csr>>     | Read control/status register                       | 4 bytes read
+|`0x3` |<<cmd-w.csr>>     | Write control/status register                      | 4 bytes write
+|`0x4` |<<cmd-r.addr>>    | Read address register                              | 1-8 bytes read
+|`0x5` |<<cmd-w.addr>>    | Write address register                             | 1-8 bytes write
+|`0x7` |<<cmd-r.data>>    | Perform bus read, and get result of last `R.DATA`  | 4 bytes read
+|`0x8` |<<cmd-r.buff>>    | Get result of last `R.DATA`                        | 4 bytes read
+|`0x9` |<<cmd-w.data>>    | Perform bus write                                  | 4 bytes write
+|Others|Reserved          | Host should never issue. Target should Disconnect. |
+
+|===
+
+[[cmd-disconnect]]
+==== DISCONNECT
+
+This instruction is used to deliberately disconnect from the DTM, without setting any error flags in the CSR. For example, when switching to a different target. See <<connected-and-disconnected>> for more information on the Connected and Disconnected states.
+
+
+`DISCONNECT` and `W.CSR` are the only side-effecting commmands the DTM will accept when an error flag is raised in the <<reg-csr>>.
+
+[[cmd-r.idcode]]
+==== R.IDCODE
+
+Return a 32-bit value that may be helpul in identifying the target. This command has no side effects.
+
+If the LSB is 1, this value is formatted identically to a standard JTAG IDCODE register, as below.
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:28 | `VERSION` | Device revision number
+| 27:12 | `PARTNO` | Device part number, in manufacturer-specific format
+| 11:8 | `BANK` | JEP106 continuation code count
+| 7:1 | `ID` | JEP106 identifier (without parity)
+| 0 | `ISJTAG` | If 1, this register is formatted as a JTAG IDCODE register.
+|===
+
+If the LSB is 0, then either:
+
+* The register is all-zeroes: no identification information is available
+* The LSBs are `'b00`, register is nonzero: reserved
+* The LSBs are `'b10`: register is in some implementation-defined format
+
+[[cmd-r.csr]]
+==== R.CSR
+
+Read the 32-bit control and status register (<<reg-csr>>). This command has no side effects.
+
+[[cmd-w.csr]]
+==== W.CSR
+
+Write the 32-bit control and status register (<<reg-csr>>).
+
+`DISCONNECT` and `W.CSR` are the only side-effecting commmands the DTM will accept when an error flag is raised in the CSR.
+
+[[cmd-w.addr]]
+==== W.ADDR
+
+Write to the address register (<<reg-addr>>). The size of the address register is fixed when the target is manufactured, and can be determined by reading the <<reg-csr>> first.
+
+For random accesses, a `W.ADDR` must be issued before each `W.DATA` or `R.DATA`. For sequential access to incrementing addresses, or repeated access to the same address, this is unnecessary, and multiple bus accesses can be performed without any intervening address register writes.
+
+[[cmd-r.addr]]
+==== R.ADDR
+
+Read back the current value of <<reg-addr>>. The size of the address register is fixed when the target is manufactured, and can be determined by reading the <<reg-csr>> first.
+
+This can be used to diagnose at what point in a sequence of incrementing reads/writes an error was raised, since the address register will have stopped incrementing immediately afterward.
+
+[[cmd-r.data]]
+==== R.DATA
+
+Initiate a downstream bus read, and return the result of the last completed downstream bus read.
+
+If a `W.DATA` command has been issued since the last `R.DATA`, this `R.DATA` command returns an undefined value.
+
+If any error flag is set in the <<reg-csr>>, this command has no side effect. No downstream bus access is initiated.
+
+If there are no error flags set, but a downstream bus access is still in progress at the point an this command is issued:
+
+* Set the <<reg-csr>>.EBUSY error flag
+* Do not initiate a new access
+* Do not increment <<reg-addr>>
+
+Finally, if a downstream bus access is not currently in progress, and no error flags are set in the <<reg-csr>>, a `R.DATA` command will:
+
+* Initiate a new downstream read access at the address indicated by <<reg-addr>>
+* If <<reg-csr>>.AINCR is set, post-increment <<reg-addr>> by 1
+
+[[cmd-r.buff]]
+==== R.BUFF
+
+Return the same value as `R.DATA`, but with no side effects on the DTM or the downstream bus.
+
+This command is issued at the end of a sequence of `R.DATA` commands, to collect the last read result.
+
+If there are no error flags set, but a downstream bus access is still in progress at the point an this command is issued:
+
+* Set the <<reg-csr>>.EBUSY error flag
+* Do not initiate a new access
+* Do not increment <<reg-addr>>
+
+Finally, if a downstream bus access is not currently in progress, and no error flags are set in the <<reg-csr>>, a `W.DATA` command will:
+
+* Initiate a new downstream write access at the address indicated by <<reg-addr>>, with the data payload of the current command
+* If <<reg-csr>>.AINCR is set, post-increment <<reg-addr>> by 1
+
+[[cmd-w.data]]
+==== W.DATA
+
+Initiate a downstream bus write.
+
+If any error flag is set in the <<reg-csr>>, this command has no side effect. No downstream bus access is initiated.
+
+=== Registers
+
+[[reg-csr]]
+==== CSR
+
+blah blah fooble wibble
+
+[[reg-addr]]
+==== ADDR
+
+This register contains an 8- to 64-bit address. This is a _word_ address, not a byte address. In other words, an 8-bit address register can address all word-aligned address in a region of 256 words, or 1024 bytes. If host software or the downstream bus prefer to work in _byte_ addresses, their addresses must be scaled accordingly.
+
+
