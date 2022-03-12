@@ -1,0 +1,8 @@
+{
+  config: {hscale: 4},
+  signal: [
+  {name: 'Write transfer',    wave: '======', data: ['W.DATA', 'D3', 'D2', 'D1', 'D0', 'Parity']},
+  {name: 'Read transfer',    wave: '=33333', data: ['R.DATA + Turn', 'D3', 'D2', 'D1', 'D0', 'Parity + Turn']},
+  {},
+  {name: 'Direction key', wave:"=3", data: ['Host-to-target', 'Target-to-host']}
+]}
