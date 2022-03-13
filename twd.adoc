@@ -12,7 +12,7 @@
 This specification defines:
 
 * The Two-Wire Debug (TWD) serial bus
-* The Debug Transport Module (DTM), which bridges a TWD connection to a downstream bus
+* The Debug Transport Module (DTM), which bridges TWD to a downstream address-mapped bus
 
 .A Two-Wire Debug system. The host uses the DCK and DIO signals to communicate with the DTM. From there, the host can access the target's internal debug hardware.
 image::img/twd_system.drawio.png[pdfwidth=40%,align=center]
@@ -123,24 +123,20 @@ The Connect sequence consists of the following:
 
 1. Eight zero-bits
 2. The following 8-byte magic sequence: `0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31`, sent MSB-first
-3. A 4-bit multidrop address (see <<multidrop>>), then an _odd_ multidrop address parity bit, then four zero bits
+3. A 4-bit multidrop address (see <<multidrop>>), then the bitwise complement of the address
 
 The DTM must correctly detect a Connect sequence preceded by any sequence of bits, including an aborted partial Connect sequence.
 
-The 8-byte magic sequence is the output of a 6-bit LFSR with taps `0x30` and initial state `0x29`. Consequently it does not contain a run of 8 bits, and so the DTM can use the leading zero-bits to find the start of the Connect sequence. The DTM is permitted to match on a Connect sequence with fewer than eight leading zero-bits, but the host must send at least eight leading bits.
+The 8-byte magic sequence is the output of a 6-bit LFSR with taps `0x30` and initial state `0x29`. Consequently it does not contain a run of 8 bits, and so the DTM can use the leading zero-bits to find the start of the Connect sequence. The DTM is permitted to match on a Connect sequence without leading zero-bits, but the host must send at least eight leading bits.
 
-For a multidrop address of 0 the full 80-bit Connect sequence is: `0x00, 0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31, 0x08`.
+For a multidrop address of 0 the full 80-bit Connect sequence is: `0x00, 0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31, 0x0f`.
 
-=== Error Handling
+At the point the debugger connects, the target state may be unknown, and it may be impossible or inappropriate to assert the target reset pin. The recommended sequence in this case is:
 
-The DTM may encounter errors due to some issue on the downstream bus, or an illegal value written to a DTM register. In this case the DTM sets some error flag in its CSR, and then begins to suppress all side effects of any command other than `DISCONNECT` and `CSR.W` until the error is cleared. Other commands:
-
-* Will not modify the DTM's internal registers (including incrementing the address register).
-* Will not initiate a downstream bus access.
-
-The <<dtm-chapter>> chapter goes into more detail about why these errors happen, and how the host can respond.
-
-As long as there are no command or write payload parity errors, the DTM remains in the Connected state, and continues to decode incoming commands.
+1. Issue 80 cycles of zeroes (the length of the longest command)
+2. Issue a <<cmd-disconnect>> command
+3. Issue a Connect sequence
+4. Check and clear the error flags in the <<reg-csr>>
 
 [[multidrop]]
 === Multidrop
@@ -152,7 +148,7 @@ A host can debug up to 16 targets sharing the same DCK and DIO signals. Each tar
 
 On power cycle or assertion of the target's reset pin, `MDROPADDR` resets to the value selected by the strap pins, or zero if there are no strap pins. If there _are_ strap pins, the address zero must be available as an option, and `MDROPADDR` must still be fully writable.
 
-To connect to a particular target, the host issues a Connect sequence with the relevant multidrop address. Targets ignore a Connect sequence with the wrong multidrop address, or a bad multidrop address parity bit, and remain in the Disconnected state.
+To connect to a particular target, the host issues a Connect sequence with the relevant multidrop address. Targets ignore a Connect sequence with the wrong multidrop address, or bad multidrop address parity, and remain in the Disconnected state.
 
 To switch to a different target, the host issues a Disconnect command (<<command-listing>>) followed by a Connect sequence for the new target.
 
@@ -233,12 +229,14 @@ Summary of commands:
 This instruction is used to deliberately disconnect from the DTM, without setting any error flags in the CSR. For example, when switching to a different target. See <<connected-and-disconnected>> for more information on the Connected and Disconnected states.
 
 
+This command has no payload and no parity byte.
+
 `DISCONNECT` and `W.CSR` are the only side-effecting commmands the DTM will accept when an error flag is raised in the <<reg-csr>>.
 
 [[cmd-r.idcode]]
 ==== R.IDCODE
 
-Return a 32-bit value that may be helpul in identifying the target. This command has no side effects.
+Return a 32-bit value that may be helpful in identifying the target. This command has no side effects.
 
 If the LSB is 1, this value is formatted identically to a standard JTAG IDCODE register, as below.
 
@@ -299,7 +297,6 @@ If there are no error flags set, and a downstream bus access is still in progres
 
 * Set the <<reg-csr>>.`EBUSY` error flag
 * Do not initiate a new access
-* Do not increment <<reg-addr>>
 
 Finally, if a downstream bus access is not currently in progress, and no error flags are set in the <<reg-csr>>, a `R.DATA` command will initiate a new downstream read access at the address indicated by <<reg-addr>>
 
