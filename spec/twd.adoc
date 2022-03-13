@@ -5,6 +5,9 @@
 
 :times: ×
 
+include::gitref.adoc[]
+:revremark: Draft
+
 = Two-Wire Debug
 
 == Introduction
@@ -19,7 +22,7 @@ image::img/twd_system.drawio.png[pdfwidth=40%,align=center]
 
 Throughout this document, _target_ refers to the device under test -- an integrated system with a single DTM, some address-mapped debug components on a bus downstream of the DTM, and presumably an actual system to be debugged -- and _host_ refers to the system communicating with and commanding the DTM, e.g. a developer's laptop and a USB debug probe.
 
-The downstream bus supports 32-bit aligned reads and writes, with a fixed address width between 8 and 64 bits, in multiples of 8. Further details of the bus are implementation-defined, and should be invisible to the DTM. Any address-mapped hardware could be attached, such as: a RISC-V Debug Module, CoreSight Access Ports with a CoreSight ROM table, or direct system bus access.
+The downstream bus supports 32-bit aligned reads and writes, with a fixed address width between 8 and 64 bits, in multiples of 8. Further details of the bus are implementation-defined, and should be invisible to the DTM. Any address-mapped hardware could be attached, such as: a RISC-V Debug Module, CoreSight Access Ports, or direct system bus access.
 
 Features of TWD:
 
