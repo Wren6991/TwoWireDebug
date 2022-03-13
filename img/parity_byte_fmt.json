@@ -1,6 +1,6 @@
 {
   config: {hscale: 2},
   signal: [
-  {name: 'DCK',    wave: 'p.........',},
-  {name: 'DIO',    wave: 'x====0.=.x', data: ['P3', 'P2', 'P1', 'P0', 'Turnaround (=zz or 00)']},
+  {name: 'DCK',    wave: 'p..........',},
+  {name: 'DIO',    wave: 'x=0=.=....x', data: ['Parity', 'Turnaround (=zz or 00)', 'Zeroes or next command']},
 ]}

@@ -12,7 +12,7 @@
 This specification defines:
 
 * The Two-Wire Debug (TWD) serial bus
-* A hardware component, the _Debug Transport Module_ (DTM), which bridges a TWD external serial connection to a downstream address-mapped bus
+* The Debug Transport Module (DTM), which bridges a TWD connection to a downstream bus
 
 .A Two-Wire Debug system. The host uses the DCK and DIO signals to communicate with the DTM. From there, the host can access the target's internal debug hardware.
 image::img/twd_system.drawio.png[pdfwidth=40%,align=center]
@@ -24,8 +24,8 @@ The downstream bus supports 32-bit aligned reads and writes, with a fixed addres
 Features of TWD:
 
 * Two wires: DCK (debug clock) and DIO (debug serial data in/out)
-** Both with a mandatory pull-down resistor on the target side
-* Supports 32-bit read/writes on an 8 to 64-bit address space
+** Both with mandatory pull-down resistors
+* Supports 32-bit read/writes on an 8- to 64-bit address space
 * Commands break down into bytes, for simple SPI host support
 * All errors are accumulative
 ** Transfers don't have a response phase; errors are explicitly polled after a command batch
@@ -52,9 +52,9 @@ Data travelling in the host-to-target direction may be referred to as _write_ da
 .Example of a read and write transfer. Bus turnaround is integral to command and parity bytes.
 image::img/read_write_fmt.png[pdfwidth=100%,align=center]
 
-Data order within each byte is MSB-first, and when multi-byte values are transferred, they are big-endian on the wire.
+Data order within each byte is MSB-first, and when multi-byte values are transferred, they are little-endian on the wire.
 
-.Bytes are MSB-first, multi-byte values are big-endian.
+.Bytes are MSB-first, multi-byte values are little-endian.
 image::img/bit_byte_order.png[pdfwidth=100%,align=center]
 
 At the target, data is captured at the rising edge of DCK, and is also launched on the rising edge of DCK. The host is responsible for maintaining good setup and hold for data captured by the target, and sampling data launched by the target at the appropriate time.
@@ -80,7 +80,7 @@ The command code specifies what operation the host is requesting, and therefore 
 
 The two turnaround cycles give time for the bus direction to be reversed during a read command. (See <<bus-tristating>>.) On write commands, the host drives DIO low for these two cycles, and on read commands, the host tristates its DIO output for these two cycles, and then continues tristating for the duration of the payload and parity bytes. The command codes are chosen such that the parity bit is always 0 for a read command, thus parking the line before the turnaround.
 
-The DTM responds to a command parity failure by setting the write parity error bit in the CSR (TODO) and entering the Disconnected link state (<<connected-and-disconnected>>).
+The DTM responds to a command parity failure by setting the write parity error bit in the <<reg-csr>> and entering the Disconnected link state (<<connected-and-disconnected>>).
 
 
 === Parity Bytes
@@ -94,28 +94,16 @@ image::img/parity_byte_fmt.png[pdfwidth=100%,align=center]
 
 The parity byte consists of:
 
-* Four odd parity bits: P3, P2, P1, P0
-** P3 is the negation of the XOR reduction of bits 7 and 3 of all payload bytes
-** P2 is the negation of the XOR reduction of bits 6 and 2 of all payload bytes
-** P1 is the negation of the XOR reduction of bits 5 and 1 of all payload bytes
-** P0 is the negation of the XOR reduction of bits 4 and 0 of all payload bytes
-* Two zero bits
+* An odd parity bit for the payload
+* A zero bit
 * Two turnaround bits
+* (Optionally) four zero bits, driven by the host, to round up to a whole byte
 
+The DTM responds to a write parity failure by setting the write parity error bit in the <<reg-csr>> and entering the Disconnected link state (<<connected-and-disconnected>>).
 
-The turnaround cycles provide a gap between the target driving data during a read command, and the beginning of the next command byte. See <<bus-tristating>>
+The turnaround cycles provide a gap between the target driving data during a read command, and the beginning of the next command byte. See <<bus-tristating>>. During a write transfer, these are driven as 0.
 
-Software can calculate the parity bits as such:
-
-[source,python]
-----
-# Python
-def parity(payload_bytes):
-	accum = 0
-	for byte in payload_bytes:
-		accum ^= ((byte >> 4) ^ byte) & 0xf
-	return ~accum & 0xf
-----
+After four cycles, the DTM considers the parity "byte" to be over. If a new command follows immediately, the DTM will recognise this command, and this slightly reduces bus overhead. However, the host is free to insert idle cycles to pad this to a whole byte, e.g. if SPI hardware is used on the host side.
 
 [[connected-and-disconnected]]
 === Connected and Disconnected States
@@ -159,12 +147,12 @@ As long as there are no command or write payload parity errors, the DTM remains 
 
 A host can debug up to 16 targets sharing the same DCK and DIO signals. Each target has a 4-bit multidrop address, which is present in the Connect sequence (<<connected-and-disconnected>>). There are two ways to configure the multidrop address:
 
-* (Mandatory support) Writing to the CSR.MDROPADDR
-* (Optional support) External strap pins to configure the initial value of CSR.MDROPADDR
+* (Mandatory support) Writing to <<reg-csr>>.`MDROPADDR`
+* (Optional support) External strap pins to configure the initial value of `MDROPADDR`
 
-On power cycle or assertion of the target's reset pin, CSR.MDROPADDR resets to the value selected by the strap pins, or zero if there are no strap pins. If there _are_ strap pins, the address zero must be available as an option, and CSR.MDROPADDR must still be fully writable.
+On power cycle or assertion of the target's reset pin, `MDROPADDR` resets to the value selected by the strap pins, or zero if there are no strap pins. If there _are_ strap pins, the address zero must be available as an option, and `MDROPADDR` must still be fully writable.
 
-To connect to a particular target, the host issues a Connect sequence with the relevant multidrop address. Targets ignore a Connect sequence with the wrong multidrop addresses, or a multidrop address parity failure, and remain in the Disconnected state.
+To connect to a particular target, the host issues a Connect sequence with the relevant multidrop address. Targets ignore a Connect sequence with the wrong multidrop address, or a bad multidrop address parity bit, and remain in the Disconnected state.
 
 To switch to a different target, the host issues a Disconnect command (<<command-listing>>) followed by a Connect sequence for the new target.
 
@@ -173,7 +161,7 @@ To assign addresses to multiple targets without address strap pins, the host mus
 1. Assert all reset pins
 2. Release the resets one at a time. For each target:
 ** Issue a Connect sequence to multidrop address 0
-** Write a unique nonzero target address to CSR.MDROPADDR
+** Write a unique nonzero target address to <<reg-csr>>.`MDROPADDR`
 ** Issue a Disconnect command
 
 The final target can be left at its initial multidrop address of zero.
@@ -186,17 +174,18 @@ TWD is designed to use a single, bidirectional data line (DIO). Whichever end is
 
 More specifically, the host tristates its output at the following times:
 
-* The last two cycles of a read command byte (command to payload turnaround)
-* The payload and checksum bytes of a read command
+* The last two cycles of a read command byte (command-to-payload turnaround)
+* Read payload bytes
+* The first four cycles of a read parity byte
 
 The target tristates its output at all times _except_ the following:
 
-* Read payload bytes (unless the read command was ignored due to a previous error)
-* The first six cycles of a read parity byte
+* Read payload bytes
+* The first two cycles of a read parity byte
 
 Turnaround cycles at the end of a read command byte and read parity byte provide a brief safe period, where neither end should be driving DIO, and DIO is simply held low by the bus pulldown resistor. The last bit driven before a turnaround is always a 0: this leaves the line charged in a 0 state, which is maintained by the pull-down.
 
-On any write or data parity error, the DTM immediately enters the Disconnected line state, causing the target to keep its output tristated until the host notices the disconnection and issues a Connect sequence. This is under the assumption that the DTM has now desynchronised from the command stream, and can not safely time its tristating.
+On a command or write data parity error, the DTM immediately enters the Disconnected line state, causing the target to keep its output tristated until the host notices the disconnection and issues a Connect sequence. This is under the assumption that the DTM has desynchronised from the command stream, and can not safely time its tristating.
 
 Though TWD has been designed to avoid simultaneous driving of the bus, it's recommended to use pads that can survive driving into a short indefinitely, or fit appropriate series resistors to limit the short current.
 
@@ -284,14 +273,16 @@ Write the 32-bit control and status register (<<reg-csr>>).
 [[cmd-w.addr]]
 ==== W.ADDR
 
-Write to the address register (<<reg-addr>>). The size of the address register is fixed when the target is manufactured, and can be determined by reading the <<reg-csr>> first.
+Write to the address register (<<reg-addr>>). The size of the address register is fixed when the target is manufactured, and can be determined by reading the `ASIZE` field of the <<reg-csr>>.
 
 For random accesses, a `W.ADDR` must be issued before each `W.DATA` or `R.DATA`. For sequential access to incrementing addresses, or repeated access to the same address, this is unnecessary, and multiple bus accesses can be performed without any intervening address register writes.
+
+If any error flag is set in the <<reg-csr>>, `W.ADDR` is ignored. If a downstream bus access is still in progress at the point a `W.ADDR` is issued, the <<reg-csr>>.`EBUSY` flag is set, and <<addr>> is not written.
 
 [[cmd-r.addr]]
 ==== R.ADDR
 
-Read back the current value of <<reg-addr>>. The size of the address register is fixed when the target is manufactured, and can be determined by reading the <<reg-csr>> first.
+Read back the current value of <<reg-addr>>.
 
 This can be used to diagnose at what point in a sequence of incrementing reads/writes an error was raised, since the address register will have stopped incrementing immediately afterward.
 
@@ -300,38 +291,26 @@ This can be used to diagnose at what point in a sequence of incrementing reads/w
 
 Initiate a downstream bus read, and return the result of the last completed downstream bus read.
 
-If a `W.DATA` command has been issued since the last `R.DATA`, this `R.DATA` command returns an undefined value.
+If a `W.DATA` command has been issued since the last `R.DATA`, or the last `R.DATA` encountered a downstream bus error, this `R.DATA` command returns an undefined value.
 
 If any error flag is set in the <<reg-csr>>, this command has no side effect. No downstream bus access is initiated.
 
-If there are no error flags set, but a downstream bus access is still in progress at the point an this command is issued:
+If there are no error flags set, and a downstream bus access is still in progress at the point an this command is issued:
 
-* Set the <<reg-csr>>.EBUSY error flag
+* Set the <<reg-csr>>.`EBUSY` error flag
 * Do not initiate a new access
 * Do not increment <<reg-addr>>
 
-Finally, if a downstream bus access is not currently in progress, and no error flags are set in the <<reg-csr>>, a `R.DATA` command will:
+Finally, if a downstream bus access is not currently in progress, and no error flags are set in the <<reg-csr>>, a `R.DATA` command will initiate a new downstream read access at the address indicated by <<reg-addr>>
 
-* Initiate a new downstream read access at the address indicated by <<reg-addr>>
-* If <<reg-csr>>.AINCR is set, post-increment <<reg-addr>> by 1
+If <<reg-csr>>.`AINCR` is set, <<reg-addr>> is incremented by 1 _after_ the downstream bus access completes.
 
 [[cmd-r.buff]]
 ==== R.BUFF
 
-Return the same value as `R.DATA`, but with no side effects on the DTM or the downstream bus.
+Return the same value as `R.DATA`, but without initiating a downstream bus access. This command is issued at the end of a sequence of `R.DATA` commands, to collect the last read result.
 
-This command is issued at the end of a sequence of `R.DATA` commands, to collect the last read result.
-
-If there are no error flags set, but a downstream bus access is still in progress at the point an this command is issued:
-
-* Set the <<reg-csr>>.EBUSY error flag
-* Do not initiate a new access
-* Do not increment <<reg-addr>>
-
-Finally, if a downstream bus access is not currently in progress, and no error flags are set in the <<reg-csr>>, a `W.DATA` command will:
-
-* Initiate a new downstream write access at the address indicated by <<reg-addr>>, with the data payload of the current command
-* If <<reg-csr>>.AINCR is set, post-increment <<reg-addr>> by 1
+If there are no error flags set, and a downstream bus access is still in progress at the point an this command is issued, `R.BUFF` will set the <<reg-csr>>.`EBUSY` error flag.
 
 [[cmd-w.data]]
 ==== W.DATA
@@ -340,16 +319,46 @@ Initiate a downstream bus write.
 
 If any error flag is set in the <<reg-csr>>, this command has no side effect. No downstream bus access is initiated.
 
+If there are no error flags set, and a downstream bus access is still in progress at the point an this command is issued:
+
+* Set the <<reg-csr>>.`EBUSY` error flag
+* Do not initiate a new access
+
+Finally, if a downstream bus access is not currently in progress, and no error flags are set in the <<reg-csr>>, a `W.DATA` command will initiate a new downstream write access at the address indicated by <<reg-addr>>, with the data payload of the current command
+
+If <<reg-csr>>.`AINCR` is set, <<reg-addr>> is incremented by 1 _after_ the downstream bus access completes.
+
 === Registers
 
 [[reg-csr]]
 ==== CSR
 
-blah blah fooble wibble
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:28 | `VERSION`      | TWD protocol version (read-only). Must = 1.
+| 26:24 | `ASIZE`        | Address register size (read-only). Size in bits = 8 × (1 + `ASIZE`)
+| 22    | `EPARITY`      | Set when write data or command parity error is detected. Write 1 to clear.
+| 21    | `EBUSFAULT`    | Set when a downstream bus access results in a bus fault, e.g. due to an unmapped address. Write 1 to clear.
+| 20    | `EBUSY`        | Set when the host attempts to initiate a downstream bus access or write to <<reg-addr>> whilst a previous access is still in progress. Write 1 to clear.
+| 16    | `AINCR`        | Address increment enable (read-write). If 1, <<reg-addr>> is incremented by 1 each time a downstream bus access completes without error, assuming no error flags are set.
+| 12    | `BUSY`         | Busy flag (read-only). Can be polled for completion of a transfer.
+| 9     | `NDTMRESET`    | Request a reset of the entire target system, except for the DTM. Read-write. The host can hold the system in reset by leaving this bit set to 1. There is no minimum duration for the host asserting `NDMRESET` -- it must be possible to reset the system by writing a 1 and then immediately a 0.
+
+If target reset is not supported, this bit must be hardwired to 0.
+| 8     | `NDTMRESETACK` | Sticky flag to acknowledge the system has come out of reset following the deassertion of `NDTMRESET`. Write 1 to clear.
+| 7:4   | `MDROPADDR`    | The 4-bit multidrop address for this DTM (read-write).
+|===
 
 [[reg-addr]]
 ==== ADDR
 
 This register contains an 8- to 64-bit address. This is a _word_ address, not a byte address. In other words, an 8-bit address register can address all word-aligned address in a region of 256 words, or 1024 bytes. If host software or the downstream bus prefer to work in _byte_ addresses, their addresses must be scaled accordingly.
 
+`ADDR` has an auto-increment feature, to support efficient sequential read/writes from the host. This feature is enabled by setting <<reg-csr>>.`AINCR` to 1. When enabled, `ADDR` increments when:
 
+* A downstream bus access completes, and
+* That downstream bus access did not encounter any errors, and
+* No error flags are set in the CSR
+
+Since the expected use case of `AINCR` is large batches of reads/writes from the host, with error flags checked at the end, it is important that `ADDR` stops incrementing when an error is encountered, so that the host can determine where in the read/write sequence the problem occurred.
