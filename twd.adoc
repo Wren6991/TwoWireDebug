@@ -85,7 +85,7 @@ The DTM responds to a command parity failure by setting the write parity error b
 
 === Parity Bytes
 
-The parity byte contains a simple checksum of the payload bytes, and travels in the same direction (host-to-target or target-to-host) as the payload bytes, depending on whether a read or write command was initiated by the command byte.
+The parity byte contains a simple checksum of the payload bytes, and travels in the same direction (host-to-target or target-to-host) as the payload bytes.
 
 
 .Structure of a parity byte
@@ -275,7 +275,7 @@ Write to the address register (<<reg-addr>>). The size of the address register i
 
 For random accesses, a `W.ADDR` must be issued before each `W.DATA` or `R.DATA`. For sequential access to incrementing addresses, or repeated access to the same address, this is unnecessary, and multiple bus accesses can be performed without any intervening address register writes.
 
-If any error flag is set in the <<reg-csr>>, `W.ADDR` is ignored. If a downstream bus access is still in progress at the point a `W.ADDR` is issued, the <<reg-csr>>.`EBUSY` flag is set, and <<addr>> is not written.
+If any error flag is set in the <<reg-csr>>, `W.ADDR` is ignored. If a downstream bus access is still in progress at the point a `W.ADDR` is issued, the <<reg-csr>>.`EBUSY` flag is set, and <<reg-addr>> is not written.
 
 [[cmd-r.addr]]
 ==== R.ADDR
