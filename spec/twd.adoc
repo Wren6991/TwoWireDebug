@@ -362,3 +362,9 @@ This register contains an 8- to 64-bit address. This is a _word_ address, not a 
 * No error flags are set in the CSR
 
 Since the expected use case of `AINCR` is large batches of reads/writes from the host, with error flags checked at the end, it is important that `ADDR` stops incrementing when an error is encountered, so that the host can determine where in the read/write sequence the problem occurred.
+
+
+== TODOs
+
+* Is it possible for the Connect sequence to appear within regular traffic? This would break multidrop. Maybe an extra link state is needed to hold a DTM idle after connecting to a different DTM.
+* Being able to observe ADDR during a bus cycle implies a shift register large enough to hold ADDR, and separate from it. Maybe this should raise a BUSY condition and return garbage.
