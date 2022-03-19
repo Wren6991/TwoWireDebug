@@ -4,5 +4,7 @@
 int main() {
 	tb t("waves.vcd");
 	connect_target(t, 0);
-	return !t.get_stat_connected();
+	idle_clocks(t, 1);
+	tb_assert(t.get_stat_connected(), "Did not connect\n");
+	return 0;
 }

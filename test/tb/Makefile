@@ -7,8 +7,13 @@ INCDIR := $(shell yosys-config --datdir)/include ../include
 
 all: tb.o
 
+SYNTH_CMD += read_verilog $(HDL);
+SYNTH_CMD += chparam -set IDCODE 32'hdeadbeef $(TOP);
+SYNTH_CMD += hierarchy -top $(TOP);
+SYNTH_CMD += write_cxxrtl dut.cpp;
+
 dut.cpp: $(HDL)
-	yosys -p "read_verilog $(HDL); hierarchy -top $(TOP); write_cxxrtl dut.cpp" 2>&1 > cxxrtl.log
+	yosys -p "$(SYNTH_CMD)" 2>&1 > cxxrtl.log
 
 tb.o: dut.cpp tb.cpp
 	clang++ -O3 -std=c++14 -Wall $(addprefix -D,$(CDEFINES)) $(addprefix -I,$(INCDIR)) -c tb.cpp -o tb.o
