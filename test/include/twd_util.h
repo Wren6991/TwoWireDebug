@@ -130,3 +130,12 @@ static inline bool check_parity_byte(tb &t, const uint8_t *rx, int n_bits) {
 	get_bits(t, &parity, 4);
 	return parity == (odd_parity(rx, n_bits) << 3);
 }
+
+// returns true == good parity
+bool read_csr(tb &t, uint32_t *csr) {
+	uint8_t csrbytes[4];
+	send_command_byte(t, CMD_R_CSR);
+	get_bits(t, csrbytes, 32);
+	*csr = bytes_to_ule32(csrbytes);
+	return check_parity_byte(t, csrbytes, 32);
+}

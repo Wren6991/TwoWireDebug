@@ -127,7 +127,7 @@ The Connect sequence consists of the following:
 1. Eight zero-bits
 2. The following 8-byte magic sequence: `0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31`, sent MSB-first
 3. 72 one-bits
-3. A 4-bit multidrop address (see <<multidrop>>), then the bitwise complement of the address
+4. A 4-bit multidrop address (see <<multidrop>>), then the bitwise complement of the address
 
 The DTM must correctly detect a Connect sequence preceded by any sequence of bits, including an aborted partial Connect sequence.
 
@@ -348,10 +348,10 @@ If <<reg-csr>>.`AINCR` is set, <<reg-addr>> is incremented by 1 _after_ the down
 | 20    | `EBUSY`        | Set when the host attempts to initiate a downstream bus access or write to <<reg-addr>> whilst a previous access is still in progress. Write 1 to clear.
 | 16    | `AINCR`        | Address increment enable (read-write). If 1, <<reg-addr>> is incremented by 1 each time a downstream bus access completes without error, assuming no error flags are set.
 | 12    | `BUSY`         | Busy flag (read-only). Can be polled for completion of a transfer.
-| 9     | `NDTMRESET`    | Request a reset of the entire target system, except for the DTM. Read-write. The host can hold the system in reset by leaving this bit set to 1. There is no minimum duration for the host asserting `NDMRESET` -- it must be possible to reset the system by writing a 1 and then immediately a 0.
+| 9     | `NDTMRESETACK` | Sticky flag to acknowledge the system has come out of reset following the deassertion of `NDTMRESET`. Write 1 to clear.
+| 8     | `NDTMRESET`    | Request a reset of the entire target system, except for the DTM. Read-write. The host can hold the system in reset by leaving this bit set to 1. There is no minimum duration for the host asserting `NDMRESET` -- it must be possible to reset the system by writing a 1 and then immediately a 0.
 
 If target reset is not supported, this bit must be hardwired to 0.
-| 8     | `NDTMRESETACK` | Sticky flag to acknowledge the system has come out of reset following the deassertion of `NDTMRESET`. Write 1 to clear.
 | 7:4   | `MDROPADDR`    | The 4-bit multidrop address for this DTM (read-write).
 |===
 

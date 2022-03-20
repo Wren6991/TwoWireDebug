@@ -8,7 +8,7 @@ INCDIR := $(shell yosys-config --datdir)/include ../include
 .SECONDARY:
 all: $(TESTS_RUN)
 
-build/%: %.cpp ../tb/tb.o
+build/%: %.cpp ../tb/tb.o ../include/twd_util.h
 	mkdir -p build
 	clang++ -O3 -std=c++14 -Wall $(addprefix -I,$(INCDIR)) $< ../tb/tb.o -o $@
 
@@ -16,7 +16,7 @@ run.%: build/%
 	./$<
 
 # Bit of a hack to trigger tb rebuild when verilog or testbench changes
-../tb/tb.o: ../tb/tb.cpp $(shell find ../.. -name "*.v")
+../tb/tb.o: ../tb/tb.cpp ../include/tb.h $(shell find ../.. -name "*.v")
 	make -C ../tb
 
 clean:
