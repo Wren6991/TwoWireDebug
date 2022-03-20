@@ -88,7 +88,7 @@ reg              errflag_busfault;
 reg              errflag_busy;
 wire             errflag_any = errflag_parity || errflag_busfault || errflag_busy;
 
-reg              bus_busy;
+wire             bus_busy;
 
 reg              csr_aincr;
 reg              csr_ndtmreset;
@@ -160,12 +160,12 @@ always @ (*) begin
 		CMD_R_DATA: begin
 			bit_ctr_nxt = 6'h1f;
 			state_nxt = S_SHIFT;
-			sreg_nxt = bus_dbuf;
+			sreg_nxt = byteswap_sreg(bus_dbuf);
 		end
 		CMD_R_BUFF: begin
 			bit_ctr_nxt = 6'h1f;
 			state_nxt = S_SHIFT;
-			sreg_nxt = bus_dbuf;
+			sreg_nxt = byteswap_sreg(bus_dbuf);
 		end
 		CMD_W_CSR: begin
 			bit_ctr_nxt = 6'h1f;
@@ -173,7 +173,7 @@ always @ (*) begin
 		end
 
 		CMD_W_ADDR: begin
-			bit_ctr_nxt = W_ADDR;
+			bit_ctr_nxt = W_ADDR - 1;
 			state_nxt = S_SHIFT;
 		end
 		CMD_W_CSR: begin
@@ -229,6 +229,9 @@ wire write_csr  = state == S_WRITE && cmd == CMD_W_CSR;
 wire write_addr = state == S_WRITE && cmd == CMD_W_ADDR;
 wire write_data = state == S_WRITE && cmd == CMD_W_DATA;
 
+wire read_data = state == S_IDLE && cmd_vld && cmd == CMD_R_DATA;
+wire read_buff = state == S_IDLE && cmd_vld && cmd == CMD_R_BUFF;
+
 // ----------------------------------------------------------------------------
 // CSR update
 
@@ -236,17 +239,104 @@ wire [31:0] csr_wdata = byteswap_sreg(sreg);
 
 always @ (posedge dck or negedge drst_n) begin
 	if (!drst_n) begin
+		csr_aincr <= 1'b0;
+		csr_ndtmreset <= 1'b0;
 		csr_mdropaddr <= 4'h0;
 	end else if (write_csr) begin
+		csr_aincr <= csr_wdata[16];
+		csr_ndtmreset <= csr_wdata[8];
 		csr_mdropaddr <= csr_wdata[7:4];
 	end
 end
 
 assign mdropaddr = csr_mdropaddr;
 
+reg ndtmresetack_prev;
+
+always @ (posedge dck or negedge drst_n) begin
+	if (!drst_n) begin
+		ndtmresetack_prev <= 1'b1;
+		csr_ndtmresetack <= 1'b0;
+	end else begin
+		// Set by rising edge of ACK, cleared by writing to CSR.
+		ndtmresetack_prev <= ndtmresetack;
+		csr_ndtmresetack <= (csr_ndtmresetack && !(write_csr && csr_wdata[9])) ||
+			(ndtmresetack && !ndtmresetack_prev);
+	end
+end
+
+wire set_errflag_busfault;
+wire set_errflag_busy;
+
+always @ (posedge dck or negedge drst_n) begin
+	if (!drst_n) begin
+		errflag_parity   <= 1'b0;
+		errflag_busy     <= 1'b0;
+		errflag_busfault <= 1'b0;
+	end else begin
+		errflag_parity <= (errflag_parity
+			&& !(write_csr && csr_wdata[22])) || serial_parity_err;
+		errflag_busfault <= (errflag_busfault
+			&& !(write_csr && csr_wdata[21])) || set_errflag_busfault;
+		errflag_busy <= (errflag_busy
+			&& !(write_csr && csr_wdata[20])) || set_errflag_busy;
+	end
+end
+
 // ----------------------------------------------------------------------------
 // Bus interface
 
+reg psel;
+reg penable;
+reg pwrite;
+
+always @ (posedge dck or negedge drst_n) begin
+	if (!drst_n) begin
+		psel <= 1'b0;
+		penable <= 1'b0;
+		pwrite <= 1'b0;
+		bus_addr <= {W_ADDR{1'b0}};
+		bus_dbuf <= {W_DATA{1'b0}};
+	end else if (psel) begin
+		if (!penable) begin
+			penable <= 1'b1;
+		end else if (dst_pready) begin
+			psel <= 1'b0;
+			penable <= 1'b0;
+			if (!pwrite) begin
+				bus_dbuf <= dst_prdata;
+			end
+			if (csr_aincr && !dst_pslverr) begin
+				bus_addr <= bus_addr + 1'b1;
+			end
+		end
+	end else if (!errflag_any) begin
+		if (write_addr) begin
+			bus_addr <= byteswap_sreg(sreg);
+		end else if (write_data) begin
+			psel <= 1'b1;
+			pwrite <= 1'b1;
+			bus_dbuf <= byteswap_sreg(sreg);
+		end else if (read_data) begin
+			psel <= 1'b1;
+			pwrite <= 1'b0;
+		end
+	end
+end
+
+assign bus_busy = psel;
+
+assign dst_psel = psel;
+assign dst_penable = penable;
+assign dst_pwrite = penable;
+assign dst_paddr = bus_addr;
+assign dst_pwdata = bus_dbuf;
+
+assign set_errflag_busfault = dst_penable && dst_pready && dst_pslverr;
+
+assign set_errflag_busy = dst_psel && (
+	write_addr || write_data || read_data || read_buff
+);
 
 endmodule
 

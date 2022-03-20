@@ -31,6 +31,8 @@ static const uint8_t seq_connect_noaddr[] = {
 
 static const unsigned CSR_MDROPADDR_LSB  = 4;
 static const uint32_t CSR_MDROPADDR_BITS = 0x000000f0u;
+static const unsigned CSR_ASIZE_LSB      = 24;
+static const uint32_t CSR_ASIZE_BITS     = 0x0f000000u;
 
 static inline uint32_t bytes_to_ule32(const uint8_t b[4]) {
 	return (uint32_t)b[3] << 24 | b[2] << 16 | b[1] << 8 | b[0];
@@ -150,6 +152,11 @@ static inline bool check_parity_byte(tb &t, const uint8_t *rx, int n_bits) {
 	return parity == (odd_parity(rx, n_bits) << 3);
 }
 
+static inline void put_bits_with_parity(tb &t, const uint8_t *tx, int n_bits) {
+	put_bits(t, tx, n_bits);
+	send_parity_byte(t, tx, n_bits);
+}
+
 // returns true == good parity
 bool read_csr(tb &t, uint32_t *csr) {
 	uint8_t csrbytes[4];
@@ -163,6 +170,34 @@ void write_csr(tb &t, uint32_t csr) {
 	uint8_t csrbytes[4];
 	ule32_to_bytes(csr, csrbytes);
 	send_command_byte(t, CMD_W_CSR);
-	put_bits(t, csrbytes, 32);
-	send_parity_byte(t, csrbytes, 32);
+	put_bits_with_parity(t, csrbytes, 32);
+}
+
+void write_addr(tb &t, uint64_t addr, unsigned int asize) {
+	uint8_t addr_bytes[8];
+	ule32_to_bytes(addr, &addr_bytes[0]);
+	ule32_to_bytes(addr >> 32, &addr_bytes[4]);
+	send_command_byte(t, CMD_W_ADDR);
+	put_bits_with_parity(t, addr_bytes, 8 * (asize + 1));
+}
+
+void write_data(tb &t, uint32_t data) {
+	uint8_t data_bytes[4];
+	ule32_to_bytes(data, data_bytes);
+	send_command_byte(t, CMD_W_DATA);
+	put_bits_with_parity(t, data_bytes, 32);
+}
+
+uint32_t read_data(tb &t) {
+	uint8_t data_bytes[4];
+	send_command_byte(t, CMD_R_DATA);
+	get_bits(t, data_bytes, 32);
+	return check_parity_byte(t, data_bytes, 32) ? bytes_to_ule32(data_bytes) : 0;
+}
+
+uint32_t read_buf(tb &t) {
+	uint8_t data_bytes[4];
+	send_command_byte(t, CMD_R_BUFF);
+	get_bits(t, data_bytes, 32);
+	return check_parity_byte(t, data_bytes, 32) ? bytes_to_ule32(data_bytes) : 0;
 }

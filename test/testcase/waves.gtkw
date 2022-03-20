@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Sat Mar 19 18:41:03 2022
+[*] Sun Mar 20 08:51:47 2022
 [*]
 [dumpfile] "/home/luke/proj/twowiredebug/test/testcase/waves.vcd"
-[dumpfile_mtime] "Sat Mar 19 18:38:21 2022"
-[dumpfile_size] 10792
+[dumpfile_mtime] "Sun Mar 20 08:41:19 2022"
+[dumpfile_size] 363520
 [savefile] "/home/luke/proj/twowiredebug/test/testcase/waves.gtkw"
 [timestart] 0
 [size] 3840 2096
 [pos] -1 -1
-*-4.290975 205 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-11.290976 4880 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [sst_width] 233
 [signals_width] 198
 [sst_expanded] 1
@@ -26,6 +26,8 @@ doe
 sercom_u.di_q
 connect_now
 connected
+@22
+connect_monitor_u.mdropaddr[3:0]
 @200
 -
 -SerCom
@@ -38,9 +40,8 @@ doe_nxt
 -
 @22
 sercom_u.state[3:0]
-@29
-sercom_u.cmd_is_write
 @28
+sercom_u.cmd_is_write
 sercom_u.cmd_parity_expect
 @200
 -
@@ -61,8 +62,6 @@ core_u.serial_wdata_vld
 @200
 -
 -Core
-@28
-core_u.state
 @22
 core_u.cmd[3:0]
 @28
@@ -71,5 +70,7 @@ core_u.cmd_is_write
 @22
 core_u.bit_ctr[5:0]
 core_u.sreg[31:0]
+@28
+core_u.state[1:0]
 [pattern_trace] 1
 [pattern_trace] 0
