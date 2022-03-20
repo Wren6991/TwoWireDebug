@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 
-def lfsr6(state):
-	return (
-		(state >> 5 & 1) ^
-		(state >> 4 & 1) ^
-		state << 1
-	) & 0x3f
+def lfsr(width, poly):
+	def f(state):
+		feedback = state & poly
+		state = (state << 1) & ((1 << width) - 1)
+		for i in range(width):
+			state ^= (feedback >> i) & 1
+		return state
+	return f
+
+lfsr5 = lfsr(5, 0x14)
+lfsr6 = lfsr(6, 0x30)
+lfsr7 = lfsr(7, 0x60)
 
 def lfsr_to_bytes(lfsr, state, statewidth, nbytes):
 	l = []

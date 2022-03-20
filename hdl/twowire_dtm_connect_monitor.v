@@ -23,7 +23,7 @@ localparam LFSR_INIT = 6'h29;
 
 reg [5:0] lfsr;
 wire      lfsr_out = lfsr[5];
-wire      seq_restart;
+reg       seq_restart;
 
 always @ (posedge dck or negedge drst_n) begin
 	if (!drst_n) begin
@@ -39,24 +39,38 @@ end
 // - Some number of zeroes from the host that doesn't appear elsewhere in the
 //   sequence (sync/preamble) which basically clears this sequence counter
 // - 64 bits of LFSR output, starting and ending with a `1` bit
+// - 72 ones, which can't appear in regular TWD traffic
 // - 4-bit target address, followed by its bitwise complement
 
-reg [6:0] seq_ctr;
-assign seq_restart = connected ||
-	!seq_ctr[6] && di_q != lfsr_out ||                              // LFSR seq mismatch
-	 seq_ctr[6] && (di_q ^ seq_ctr[2]) != mdropaddr[~seq_ctr[1:0]]; // Address mismatch
+reg [7:0] seq_ctr;
 
-always @ (posedge dck or negedge drst_n) begin
-	if (!drst_n) begin
-		seq_ctr <= 7'h00;
-	end else if (seq_restart) begin
-		seq_ctr <= 7'h00;
+always @ (*) begin
+	seq_restart = 1'b0;
+	if (connected) begin
+		seq_restart = 1'b1;
+	end else if (~|seq_ctr[7:6]) begin
+		// Bits 0..63: match LFSR output
+		seq_restart = di_q != lfsr_out;
+	end else if (~&{seq_ctr[7], seq_ctr[3]}) begin
+		// Bits 64..135: all ones
+		seq_restart = !di_q;
 	end else begin
-		seq_ctr <= seq_ctr + 7'h01;
+		// Bits 136..143: address followed by complement of address
+		seq_restart = (di_q ^ seq_ctr[2]) != mdropaddr[~seq_ctr[1:0]];
 	end
 end
 
-assign connect_now = seq_ctr == 7'h47 && di_q == !mdropaddr[0];
+always @ (posedge dck or negedge drst_n) begin
+	if (!drst_n) begin
+		seq_ctr <= 8'h00;
+	end else if (seq_restart) begin
+		seq_ctr <= 8'h00;
+	end else begin
+		seq_ctr <= seq_ctr + 8'h01;
+	end
+end
+
+assign connect_now = seq_ctr == 8'h8f && di_q == !mdropaddr[0];
 
 endmodule
 

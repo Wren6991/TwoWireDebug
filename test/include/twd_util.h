@@ -66,12 +66,14 @@ static const uint8_t seq_connect_noaddr[] = {
 	// Sync LFSR
 	0x00,
 	// 64 bits of LFSR output
-	0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31
+	0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31,
+	// 72 1s
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 	// Then 4-bit address, followed by its complement
 };
 
 static inline void connect_target(tb &t, uint8_t addr) {
-	put_bits(t, seq_connect_noaddr, 72);
+	put_bits(t, seq_connect_noaddr, 144);
 	addr = (addr << 4) | (~addr & 0xfu);
 	put_bits(t, &addr, 8);
 }

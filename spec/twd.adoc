@@ -126,17 +126,22 @@ The Connect sequence consists of the following:
 
 1. Eight zero-bits
 2. The following 8-byte magic sequence: `0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31`, sent MSB-first
+3. 72 one-bits
 3. A 4-bit multidrop address (see <<multidrop>>), then the bitwise complement of the address
 
 The DTM must correctly detect a Connect sequence preceded by any sequence of bits, including an aborted partial Connect sequence.
 
 The 8-byte magic sequence is the output of a 6-bit LFSR with taps `0x30` and initial state `0x29`. Consequently it does not contain a run of 8 bits, and so the DTM can use the leading zero-bits to find the start of the Connect sequence. The DTM is permitted to match on a Connect sequence without leading zero-bits, but the host must send at least eight leading bits.
 
-For a multidrop address of 0 the full 80-bit Connect sequence is: `0x00, 0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31, 0x0f`.
+The run of 9 `0xff` bytes is a sequence which can't occur in TWD bus traffic. On a multidrop bus, this ensures Disconnected targets will never see a Connect sequence in traffic to the currently Connected target.
+
+For a multidrop address of 0, the full 152-bit Connect sequence is: `0x00, 0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0f`.
 
 At the point the debugger connects, the target state may be unknown, and it may be impossible or inappropriate to assert the target reset pin. The recommended sequence in this case is:
 
-1. Issue 80 cycles of zeroes (the length of the longest command)
+1. Issue DCK 80 cycles with DIO tristated, at a low frequency
+** Causes the target's DIO output to become tristated, if it was part way through a read response
+** Bus pulldown ensures no spurious commands are issued
 2. Issue a <<cmd-disconnect>> command
 3. Issue a Connect sequence
 4. Check and clear the error flags in the <<reg-csr>>
@@ -366,5 +371,5 @@ Since the expected use case of `AINCR` is large batches of reads/writes from the
 
 == TODOs
 
-* Is it possible for the Connect sequence to appear within regular traffic? This would break multidrop. Maybe an extra link state is needed to hold a DTM idle after connecting to a different DTM.
 * Being able to observe ADDR during a bus cycle implies a shift register large enough to hold ADDR, and separate from it. Maybe this should raise a BUSY condition and return garbage.
+* Narrow bus accesses?
