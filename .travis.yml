@@ -1,0 +1,20 @@
+branches:
+ only:
+   - master
+dist: focal
+before_install:
+  - sudo apt-get -qq update && sudo apt-get install -y ruby-asciidoctor-pdf coderay fonts-arphic-gkai00mp ruby-pdf-inspector ruby-prawn-doc doc-base treetop ttf-dejavu-core && gem install public_suffix
+script:
+  - make -C spec
+before_deploy:
+  - git tag "draft-$(date +'%Y%m%d')-$(git log --format=%h -1)"
+deploy:
+  provider: releases
+  edge: true
+  api_key: $github_access_token
+  file_glob: true
+  file: spec/*.pdf
+  cleanup: false
+  on:
+    repo: Wren6991/TwoWireDebug
+    branch: master
