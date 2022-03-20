@@ -10,9 +10,31 @@
 `default_nettype none
 
 module twowire_dtm #(
+	// If IDCODE[0] == 1'b1, this is formatted as a JTAG IDCODE register.
+	// If all-zeroes, no identifier provided.
+	parameter IDCODE            = 32'h0,
+
 	// Address size = 8 * (1 + ASIZE) bits. Maximum 64 bits.
-	parameter ASIZE  = 0,
-	parameter IDCODE = 32'h0
+	parameter ASIZE             = 0,
+
+	// Support any/all of the possible DSIZE values. Must support at least one.
+	parameter SUPPORT_DSIZE_8B  = 0,
+	parameter SUPPORT_DSIZE_16B = 0,
+	parameter SUPPORT_DSIZE_32B = 1,
+	parameter SUPPORT_DSIZE_64B = 0,
+
+	// Driven parameters, do not modify:
+
+	parameter MAX_DSIZE = SUPPORT_DSIZE_64B ? 3 :
+	                      SUPPORT_DSIZE_32B ? 2 :
+	                      SUPPORT_DSIZE_16B ? 1 : 0,   // do not modify
+
+	// paddr is a byte address, and is scaled according to current DSIZE, so
+	// address width depends on max DSIZE as well as on ASIZE.
+
+	parameter W_ADDR    = 8 * (1 + ASIZE) + MAX_DSIZE, // do not modify
+
+	parameter W_DATA    = 8 << MAX_DSIZE               // do not modify
 ) (
 	// Debug clock and debug reset
 	input  wire                     dck,
@@ -27,7 +49,7 @@ module twowire_dtm #(
 	output wire                     host_connected,
 
 	// Downstream bus (APB3 ish)
-	output wire [8*(1 + ASIZE)-1:0] dst_paddr,
+	output wire [W_ADDR-1:0]        dst_paddr,
 	output wire                     dst_psel,
 	output wire                     dst_penable,
 	output wire                     dst_pwrite,

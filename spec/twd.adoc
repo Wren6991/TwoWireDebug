@@ -22,7 +22,7 @@ image::img/twd_system.drawio.png[pdfwidth=40%,align=center]
 
 Throughout this document, _target_ refers to the device under test -- an integrated system with a single DTM, some address-mapped debug components on a bus downstream of the DTM, and presumably an actual system to be debugged -- and _host_ refers to the system communicating with and commanding the DTM, e.g. a developer's laptop and a USB debug probe.
 
-The downstream bus supports 32-bit aligned reads and writes, with a fixed address width between 8 and 64 bits, in multiples of 8. Further details of the bus are implementation-defined, and should be invisible to the DTM. Any address-mapped hardware could be attached, such as: a RISC-V Debug Module, CoreSight Access Ports, or direct system bus access.
+The downstream bus supports (some subset of) 8- to 64-bit aligned reads and writes, with a fixed address width between 8 and 64 bits. Further details of the bus are implementation-defined, and should be invisible to the DTM. Any address-mapped hardware could be attached, such as: a RISC-V Debug Module, CoreSight Access Ports, or direct system bus access.
 
 Features of TWD:
 
@@ -224,9 +224,9 @@ Summary of commands:
 |`0x3` |<<cmd-w.csr>>     | Write control/status register                      | 4 bytes write
 |`0x4` |<<cmd-r.addr>>    | Read address register                              | 1-8 bytes read
 |`0x5` |<<cmd-w.addr>>    | Write address register                             | 1-8 bytes write
-|`0x7` |<<cmd-r.data>>    | Perform bus read, and get result of last `R.DATA`  | 4 bytes read
-|`0x8` |<<cmd-r.buff>>    | Get result of last `R.DATA`                        | 4 bytes read
-|`0x9` |<<cmd-w.data>>    | Perform bus write                                  | 4 bytes write
+|`0x7` |<<cmd-r.data>>    | Perform bus read, and get result of last `R.DATA`  | 1-8 bytes read
+|`0x8` |<<cmd-r.buff>>    | Get result of last `R.DATA`                        | 1-8 bytes read
+|`0x9` |<<cmd-w.data>>    | Perform bus write                                  | 1-8 bytes write
 |Others|Reserved          | Host should never issue. Target should Disconnect. |
 
 |===
@@ -295,9 +295,13 @@ This can be used to diagnose at what point in a sequence of incrementing reads/w
 [[cmd-r.data]]
 ==== R.DATA
 
-Initiate a downstream bus read, and return the result of the last completed downstream bus read.
+Initiate a downstream bus read from the address indicated by <<reg-addr>>, and return the result of the last completed downstream bus read. The data size of the bus read, and the payload size of the `R.DATA` command, are determined by the <<reg-csr>>.`DSIZE` field.
 
-If a `W.DATA` command has been issued since the last `R.DATA`, or the last `R.DATA` encountered a downstream bus error, this `R.DATA` command returns an undefined value.
+If any of the following are true, this `R.DATA` command returns an undefined value:
+
+* A `W.DATA` command has been issued since the last `R.DATA`
+* <<reg-csr>>.`DSIZE` has been changed since the last `R.DATA`
+* The last `R.DATA` encountered a downstream bus error
 
 If any error flag is set in the <<reg-csr>>, this command has no side effect. No downstream bus access is initiated.
 
@@ -320,7 +324,7 @@ If there are no error flags set, and a downstream bus access is still in progres
 [[cmd-w.data]]
 ==== W.DATA
 
-Initiate a downstream bus write.
+Initiate a downstream bus write to the address indicated by <<reg-addr>>. The data size of the bus write, and the payload size of the `W.DATA` command, are determined by the <<reg-csr>>.`DSIZE` field.
 
 If any error flag is set in the <<reg-csr>>, this command has no side effect. No downstream bus access is initiated.
 
@@ -342,25 +346,48 @@ If <<reg-csr>>.`AINCR` is set, <<reg-addr>> is incremented by 1 _after_ the down
 |===
 | Bits | Name | Description
 | 31:28 | `VERSION`      | TWD protocol version (read-only). Must = 1.
-| 26:24 | `ASIZE`        | Address register size (read-only). Size in bits = 8 × (1 + `ASIZE`)
-| 22    | `EPARITY`      | Set when write data or command parity error is detected. Write 1 to clear.
-| 21    | `EBUSFAULT`    | Set when a downstream bus access results in a bus fault, e.g. due to an unmapped address. Write 1 to clear.
-| 20    | `EBUSY`        | Set when the host attempts to initiate a downstream bus access or write to <<reg-addr>> whilst a previous access is still in progress. Write 1 to clear.
-| 16    | `AINCR`        | Address increment enable (read-write). If 1, <<reg-addr>> is incremented by 1 each time a downstream bus access completes without error, assuming no error flags are set.
-| 12    | `BUSY`         | Busy flag (read-only). Can be polled for completion of a transfer.
-| 9     | `NDTMRESETACK` | Sticky flag to acknowledge the system has come out of reset following the deassertion of `NDTMRESET`. Write 1 to clear.
-| 8     | `NDTMRESET`    | Request a reset of the entire target system, except for the DTM. Read-write. The host can hold the system in reset by leaving this bit set to 1. There is no minimum duration for the host asserting `NDMRESET` -- it must be possible to reset the system by writing a 1 and then immediately a 0.
+| 26:24 | `ASIZE`        | Address register size (read-only). Size in bits = 8 × (1 + `ASIZE`).
+| 21:20 | `DSIZE`        | Data transfer size (write-any read-legal). Size in bits = 8 << `DSIZE`.
+
+The DTM may not support all values of `DSIZE`. If the host writes an unsupported value, the DTM sets `DSIZE` to some implementation-defined value which it _does_ support. The host can discover the supported data sizes by writing and reading back `DSIZE`.
+| 18    | `EPARITY`      | Set when write data or command parity error is detected. Write 1 to clear.
+| 17    | `EBUSFAULT`    | Set when a downstream bus access results in a bus fault, e.g. due to an unmapped address. Write 1 to clear.
+| 16    | `EBUSY`        | Set when the host attempts to initiate a downstream bus access or write to <<reg-addr>> whilst a previous access is still in progress. Write 1 to clear.
+| 12    | `AINCR`        | Address increment enable (read-write). If 1, <<reg-addr>> is incremented by 1 each time a downstream bus access completes without error, assuming no error flags are set.
+| 8    | `BUSY`         | Busy flag (read-only). Can be polled for completion of a transfer.
+| 5     | `NDTMRESETACK` | Sticky flag to acknowledge the system has come out of reset following the deassertion of `NDTMRESET`. Write 1 to clear.
+| 4     | `NDTMRESET`    | Request a reset of the entire target system, except for the DTM. Read-write. The host can hold the system in reset by leaving this bit set to 1. There is no minimum duration for the host asserting `NDMRESET` -- it must be possible to reset the system by writing a 1 and then immediately a 0.
 
 If target reset is not supported, this bit must be hardwired to 0.
-| 7:4   | `MDROPADDR`    | The 4-bit multidrop address for this DTM (read-write).
+| 3:0   | `MDROPADDR`    | The 4-bit multidrop address for this DTM (read-write).
 |===
 
 [[reg-addr]]
 ==== ADDR
 
-This register contains an 8- to 64-bit address. This is a _word_ address, not a byte address. In other words, an 8-bit address register can address all word-aligned address in a region of 256 words, or 1024 bytes. If host software or the downstream bus prefer to work in _byte_ addresses, their addresses must be scaled accordingly.
+This register contains an 8- to 64-bit address, indicating the memory location to be accessed by <<cmd-w.data>> and <<cmd-r.data>> commands.
 
-`ADDR` has an auto-increment feature, to support efficient sequential read/writes from the host. This feature is enabled by setting <<reg-csr>>.`AINCR` to 1. When enabled, `ADDR` increments when:
+===== Address Scaling
+
+The addressing unit of `ADDR` is determined by the current value of <<reg-csr>>.`DSIZE`:
+
+* `DSIZE` = 0: address is in units of 1 byte
+* `DSIZE` = 1: address is in units of 2 bytes
+* `DSIZE` = 2: address is in units of 4 bytes
+* `DSIZE` = 3: address is in units of 8 bytes
+
+For example, a DTM attached to a RISC-V Debug Module, requiring only 32-bit transfers with a 7-bit word address, could have an `ASIZE` of 0 (8-bit addresses) and have `DSIZE` hardwired to 2. This allows the DTM to access arbitrary 8-bit word addresses or, equivalently, all word-aligned locations in a 10-bit byte-addressed space.
+
+Or, a target which exposes a 32-bit system address space alongside some debug-specific registers could have an `ASIZE` of 3, such that:
+
+* Byte read/writes are supported on the entire 32-bit byte-addressed system bus (4 GiB of address space)
+* Word read/writes can see a larger 16 GiB address window
+** Debug-specific registers mapped at a +4GiB offset, accessible only from the DTM
+** Could provide different views of memory, e.g. physical vs virtual
+
+===== Auto-increment
+
+`ADDR` has an auto-increment feature, to support efficient sequential read/writes from the host. This feature is enabled by setting <<reg-csr>>.`AINCR` to 1. When enabled, `ADDR` increments by 1 when:
 
 * A downstream bus access completes, and
 * That downstream bus access did not encounter any errors, and
@@ -372,4 +399,5 @@ Since the expected use case of `AINCR` is large batches of reads/writes from the
 == TODOs
 
 * Being able to observe ADDR during a bus cycle implies a shift register large enough to hold ADDR, and separate from it. Maybe this should raise a BUSY condition and return garbage.
-* Narrow bus accesses?
+** More implementation work to see if this is possible/sensible.
+* Expand parity byte to a full byte, with e.g. CRC5?
