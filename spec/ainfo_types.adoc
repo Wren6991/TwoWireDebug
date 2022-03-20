@@ -1,0 +1,8 @@
+[cols="20h,~", options="header"]
+|===
+|Type | Description
+| `0x000` | Memory window (virtual address)
+| `0x001` | Memory window (physical address)
+| `0x002` | RISC-V Debug Module
+| `0x003` | CoreSight Access Point
+|===

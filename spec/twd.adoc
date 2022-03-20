@@ -227,6 +227,7 @@ Summary of commands:
 |`0x7` |<<cmd-r.data>>    | Perform bus read, and get result of last `R.DATA`  | 1-8 bytes read
 |`0x8` |<<cmd-r.buff>>    | Get result of last `R.DATA`                        | 1-8 bytes read
 |`0x9` |<<cmd-w.data>>    | Perform bus write                                  | 1-8 bytes write
+|`0xb` |<<cmd-r.ainfo>>   | Read from the <<address-info-table>>               | 4 bytes read
 |Others|Reserved          | Host should never issue. Target should Disconnect. |
 
 |===
@@ -337,6 +338,13 @@ Finally, if a downstream bus access is not currently in progress, and no error f
 
 If <<reg-csr>>.`AINCR` is set, <<reg-addr>> is incremented by 1 _after_ the downstream bus access completes.
 
+[[cmd-r.ainfo]]
+==== R.AINFO
+
+Read from the <<address-info-table>>. If no address map information is available, this command returns all-zeroes.
+
+If address map information is available, this command returns a 32-bit entry from the address information table, indexed by <<reg-addr>>.
+
 === Registers
 
 [[reg-csr]]
@@ -395,6 +403,38 @@ Or, a target which exposes a 32-bit system address space alongside some debug-sp
 
 Since the expected use case of `AINCR` is large batches of reads/writes from the host, with error flags checked at the end, it is important that `ADDR` stops incrementing when an error is encountered, so that the host can determine where in the read/write sequence the problem occurred.
 
+Reading the address info table via <<cmd-r.ainfo>> will also increment `ADDR`, if <<reg-csr>>.`AINCR` is 1 and the downstream bus is not busy.
+
+[[address-info-table]]
+== Address Information Table
+
+The address information table (AINFO) provides an overview of the downstream address map. Each 32-bit entry is read using a <<cmd-r.ainfo>> command, and <<reg-addr>> is used to index the table.
+
+The table is optional, and if no address information is present, the <<cmd-r.ainfo>> command will return all-zeroes.
+
+This table doesn't try to replace any of the standard discovery mechanisms that may be used downstream (such as a CoreSight ROM table). Rather, it should give enough information to identify what those standard mechanisms _are_, and where to start the discovery process.
+
+The host should always start reading AINFO from <<reg-addr>> = 0, and continue until encountering an entry with `VALID` = 0, indicating the end of the table. The result of reading past the first invalid entry is undefined; there is no requirement for the DTM to decode all <<reg-addr>> bits for AINFO reads.
+
+=== AINFO Entry Format
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:24 | `BASE` | Segment base address, corresponding to the 8 MSBs of the <<reg-addr>> value, at the largest supported <<reg-csr>>.`DSIZE`.
+| 22:16 | `SIZE` | Log2 of segment size in bytes.
+| 11:4 | `TYPE` | If `IMPDEF` is 0, this field indicates one of the standard segment types (see <<standard-ainfo-types>>). If `IMPDEF` is 1, some implementation-defined value.
+| 2 | `IMPDEF` | If 1, the value stored in `TYPE` is in some implementation-defined format that doesn't correspond to the standard segment types listed in <<standard-ainfo-types>>.
+| 1 | `PRESENT` | If 0, the hardware corresponding to this entry is not present (e.g. has been tied off). This entry may still be `VALID`, in which case, the host should continue reading the table..
+| 0 | `VALID` | If 1, this is a valid AINFO table entry. If 0, there is no AINFO information in this entry, and the host should not read past this point.
+|===
+
+[[standard-ainfo-types]]
+=== Standard AINFO Types
+
+include::ainfo_types.adoc[]
+
+To add a type to this list, raise a pull request on https://github.com/Wren6991/TwoWireDebug/blob/master/spec/ainfo_types.adoc[spec/ainfo_types.adoc on Github].
 
 == TODOs
 

@@ -1,6 +1,6 @@
 # Two-Wire Debug
 
-A low-pin-count debug transport. Read the asciidoc version of the specification [here](spec/twd.adoc), or go to [releases](https://github.com/Wren6991/TwoWireDebug/releases/) to get the latest PDF version.
+A low-pin-count debug transport. Read the asciidoc version of the specification [here](spec/twd.adoc), or go to [releases](https://github.com/Wren6991/TwoWireDebug/releases/latest) to get the latest PDF.
 
 ## Overview
 
