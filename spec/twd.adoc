@@ -22,7 +22,7 @@ image::img/twd_system.drawio.png[pdfwidth=40%,align=center]
 
 Throughout this document, _target_ refers to the device under test -- an integrated system with a single DTM, some address-mapped debug components on a bus downstream of the DTM, and presumably an actual system to be debugged -- and _host_ refers to the system communicating with and commanding the DTM, e.g. a developer's laptop and a USB debug probe.
 
-The downstream bus supports (some subset of) 8- to 64-bit aligned reads and writes, with a fixed address width between 8 and 64 bits. Further details of the bus are implementation-defined, and should be invisible to the DTM. Any address-mapped hardware could be attached, such as: a RISC-V Debug Module, CoreSight Access Ports, or direct system bus access.
+The downstream bus supports 32-bit aligned reads and writes, with a fixed address width between 8 and 64 bits. Further details of the bus are implementation-defined, and should be invisible to the DTM. Any address-mapped hardware could be attached, such as: a RISC-V Debug Module, CoreSight Access Ports, or direct system bus access.
 
 Features of TWD:
 
@@ -224,10 +224,10 @@ Summary of commands:
 |`0x3` |<<cmd-w.csr>>     | Write control/status register                      | 4 bytes write
 |`0x4` |<<cmd-r.addr>>    | Read address register                              | 1-8 bytes read
 |`0x5` |<<cmd-w.addr>>    | Write address register                             | 1-8 bytes write
-|`0x7` |<<cmd-r.data>>    | Perform bus read, and get result of last `R.DATA`  | 1-8 bytes read
-|`0x8` |<<cmd-r.buff>>    | Get result of last `R.DATA`                        | 1-8 bytes read
-|`0x9` |<<cmd-w.data>>    | Perform bus write                                  | 1-8 bytes write
-|`0xb` |<<cmd-r.ainfo>>   | Read from the <<address-info-table>>               | 4 bytes read
+|`0x7` |<<cmd-r.data>>    | Perform bus read, and get result of last `R.DATA`  | 4 bytes read
+|`0x8` |<<cmd-r.buff>>    | Get result of last `R.DATA`                        | 4 bytes read
+|`0x9` |<<cmd-w.data>>    | Perform bus write                                  | 4 bytes write
+|`0xb` |<<cmd-r.ainfo>>   | Read the <<address-info-table>>                    | 4 bytes read
 |Others|Reserved          | Host should never issue. Target should Disconnect. |
 
 |===
@@ -296,12 +296,11 @@ This can be used to diagnose at what point in a sequence of incrementing reads/w
 [[cmd-r.data]]
 ==== R.DATA
 
-Initiate a downstream bus read from the address indicated by <<reg-addr>>, and return the result of the last completed downstream bus read. The data size of the bus read, and the payload size of the `R.DATA` command, are determined by the <<reg-csr>>.`DSIZE` field.
+Initiate a downstream 32-bit bus read from the address indicated by <<reg-addr>>, and return the result of the last completed downstream bus read.
 
 If any of the following are true, this `R.DATA` command returns an undefined value:
 
 * A `W.DATA` command has been issued since the last `R.DATA`
-* <<reg-csr>>.`DSIZE` has been changed since the last `R.DATA`
 * The last `R.DATA` encountered a downstream bus error
 
 If any error flag is set in the <<reg-csr>>, this command has no side effect. No downstream bus access is initiated.
@@ -325,7 +324,7 @@ If there are no error flags set, and a downstream bus access is still in progres
 [[cmd-w.data]]
 ==== W.DATA
 
-Initiate a downstream bus write to the address indicated by <<reg-addr>>. The data size of the bus write, and the payload size of the `W.DATA` command, are determined by the <<reg-csr>>.`DSIZE` field.
+Initiate a downstream 32-bit bus write to the address indicated by <<reg-addr>>.
 
 If any error flag is set in the <<reg-csr>>, this command has no side effect. No downstream bus access is initiated.
 
@@ -345,6 +344,8 @@ Read from the <<address-info-table>>. If no address map information is available
 
 If address map information is available, this command returns a 32-bit entry from the address information table, indexed by <<reg-addr>>.
 
+If <<reg-csr>>.`AINCR` is set, this command increments <<reg-addr>> by 1 with each read, unless a downstream bus access is in progress, in which case <<reg-addr>> will not increment and <<reg-csr>>.`EBUSY` will be set.
+
 === Registers
 
 [[reg-csr]]
@@ -352,17 +353,14 @@ If address map information is available, this command returns a 32-bit entry fro
 
 [cols="10h,20h,~", options="header"]
 |===
-| Bits | Name | Description
+| Bits  | Name | Description
 | 31:28 | `VERSION`      | TWD protocol version (read-only). Must = 1.
 | 26:24 | `ASIZE`        | Address register size (read-only). Size in bits = 8 × (1 + `ASIZE`).
-| 21:20 | `DSIZE`        | Data transfer size (write-any read-legal). Size in bits = 8 << `DSIZE`.
-
-The DTM may not support all values of `DSIZE`. If the host writes an unsupported value, the DTM sets `DSIZE` to some implementation-defined value which it _does_ support. The host can discover the supported data sizes by writing and reading back `DSIZE`.
 | 18    | `EPARITY`      | Set when write data or command parity error is detected. Write 1 to clear.
 | 17    | `EBUSFAULT`    | Set when a downstream bus access results in a bus fault, e.g. due to an unmapped address. Write 1 to clear.
 | 16    | `EBUSY`        | Set when the host attempts to initiate a downstream bus access or write to <<reg-addr>> whilst a previous access is still in progress. Write 1 to clear.
 | 12    | `AINCR`        | Address increment enable (read-write). If 1, <<reg-addr>> is incremented by 1 each time a downstream bus access completes without error, assuming no error flags are set.
-| 8    | `BUSY`         | Busy flag (read-only). Can be polled for completion of a transfer.
+| 8     | `BUSY`         | Busy flag (read-only). Can be polled for completion of a transfer.
 | 5     | `NDTMRESETACK` | Sticky flag to acknowledge the system has come out of reset following the deassertion of `NDTMRESET`. Write 1 to clear.
 | 4     | `NDTMRESET`    | Request a reset of the entire target system, except for the DTM. Read-write. The host can hold the system in reset by leaving this bit set to 1. There is no minimum duration for the host asserting `NDMRESET` -- it must be possible to reset the system by writing a 1 and then immediately a 0.
 
@@ -373,25 +371,7 @@ If target reset is not supported, this bit must be hardwired to 0.
 [[reg-addr]]
 ==== ADDR
 
-This register contains an 8- to 64-bit address, indicating the memory location to be accessed by <<cmd-w.data>> and <<cmd-r.data>> commands.
-
-===== Address Scaling
-
-The addressing unit of `ADDR` is determined by the current value of <<reg-csr>>.`DSIZE`:
-
-* `DSIZE` = 0: address is in units of 1 byte
-* `DSIZE` = 1: address is in units of 2 bytes
-* `DSIZE` = 2: address is in units of 4 bytes
-* `DSIZE` = 3: address is in units of 8 bytes
-
-For example, a DTM attached to a RISC-V Debug Module, requiring only 32-bit transfers with a 7-bit word address, could have an `ASIZE` of 0 (8-bit addresses) and have `DSIZE` hardwired to 2. This allows the DTM to access arbitrary 8-bit word addresses or, equivalently, all word-aligned locations in a 10-bit byte-addressed space.
-
-Or, a target which exposes a 32-bit system address space alongside some debug-specific registers could have an `ASIZE` of 3, such that:
-
-* Byte read/writes are supported on the entire 32-bit byte-addressed system bus (4 GiB of address space)
-* Word read/writes can see a larger 16 GiB address window
-** Debug-specific registers mapped at a +4GiB offset, accessible only from the DTM
-** Could provide different views of memory, e.g. physical vs virtual
+This register contains an 8- to 64-bit address, indicating the memory location to be accessed by <<cmd-w.data>> and <<cmd-r.data>> commands. This is a _word_ address, not a byte address. For example, a DTM with an 8-bit `ADDR` register (an `ASIZE` of 0) can access arbitrary 8-bit word addresses or, equivalently, all word-aligned locations in a 10-bit byte-addressed space.
 
 ===== Auto-increment
 
@@ -412,21 +392,23 @@ The address information table (AINFO) provides an overview of the downstream add
 
 The table is optional, and if no address information is present, the <<cmd-r.ainfo>> command will return all-zeroes.
 
-This table doesn't try to replace any of the standard discovery mechanisms that may be used downstream (such as a CoreSight ROM table). Rather, it should give enough information to identify what those standard mechanisms _are_, and where to start the discovery process.
+This table doesn't try to replace any of the standard discovery mechanisms that may be used downstream (such as a CoreSight ROM table). Rather, it should give enough information to identify what those standard mechanisms _are_, and where to start the discovery process. This is under the assumption that the MSBs of the address are used to coarsely divide the downstream address space into different debug-related functionality.
 
 The host should always start reading AINFO from <<reg-addr>> = 0, and continue until encountering an entry with `VALID` = 0, indicating the end of the table. The result of reading past the first invalid entry is undefined; there is no requirement for the DTM to decode all <<reg-addr>> bits for AINFO reads.
+
+If some debug agent is present (such as a RISC-V Debug Module), this must be the _first_ entry with its `PRESENT` bit set, usually at offset 0 in the table. There may be multiple debug agents present in the table, but being the first present entry should be considered a strong hint to the host that it should start here to perform further deeper discovery.
 
 === AINFO Entry Format
 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits | Name | Description
-| 31:24 | `BASE` | Segment base address, corresponding to the 8 MSBs of the <<reg-addr>> value, at the largest supported <<reg-csr>>.`DSIZE`.
-| 22:16 | `SIZE` | Log2 of segment size in bytes.
+| 31:24 | `BASE` | MSBs of segment base address. Full address is `BASE` followed by 8 × `ASIZE` zero bits. This is a _word_ address, the same as <<reg-addr>>.
+| 19:12 | `EXTRA` | Extra information specific to this `TYPE` of segment, or reserved/0 if this type does not have extra information.
 | 11:4 | `TYPE` | If `IMPDEF` is 0, this field indicates one of the standard segment types (see <<standard-ainfo-types>>). If `IMPDEF` is 1, some implementation-defined value.
 | 2 | `IMPDEF` | If 1, the value stored in `TYPE` is in some implementation-defined format that doesn't correspond to the standard segment types listed in <<standard-ainfo-types>>.
-| 1 | `PRESENT` | If 0, the hardware corresponding to this entry is not present (e.g. has been tied off). This entry may still be `VALID`, in which case, the host should continue reading the table..
-| 0 | `VALID` | If 1, this is a valid AINFO table entry. If 0, there is no AINFO information in this entry, and the host should not read past this point.
+| 1 | `PRESENT` | If 0, the hardware corresponding to this entry is not present (e.g. has been disabled during production). This entry may still be `VALID`, in which case, the host should continue reading the table.
+| 0 | `VALID` | If 1, this is a valid AINFO entry. If 0, there is no AINFO information in this entry, and the host must not read past this point.
 |===
 
 [[standard-ainfo-types]]

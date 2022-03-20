@@ -1,8 +1,7 @@
-[cols="20h,~", options="header"]
+[cols="10h,30h,~", options="header"]
 |===
-|Type | Description
-| `0x000` | Memory window (virtual address)
-| `0x001` | Memory window (physical address)
-| `0x002` | RISC-V Debug Module
-| `0x003` | CoreSight Access Port
+|Type     | Brief                 | Description
+| `0x000` | System bus            | Raw access to some system-bus-like address space, potentially including multiple RAM, ROM or IO regions which aren't described by this table. `EXTRA` encodes the size of the segment, as ceil(log2(size in bytes)).
+| `0x001` | RISC-V Debug Module   | The start of a chain of RISC-V Debug Modules, linked by their `nextdm` registers.
+| `0x002` | CoreSight Access Port | The least-addressed in an array of CoreSight APs. Other APs, if any, are spaced at 4 kiB intervals.
 |===
