@@ -240,8 +240,6 @@ This instruction is used to deliberately disconnect from the DTM, without settin
 
 This command has no payload and no parity byte.
 
-`DISCONNECT` and `W.CSR` are the only side-effecting commmands the DTM will accept when an error flag is raised in the <<reg-csr>>.
-
 [[cmd-r.idcode]]
 ==== R.IDCODE
 
@@ -262,8 +260,7 @@ If the LSB is 1, this value is formatted identically to a standard JTAG IDCODE r
 If the LSB is 0, then either:
 
 * The register is all-zeroes: no identification information is available
-* The LSBs are `'b00`, register is nonzero: reserved
-* The LSBs are `'b10`: register is in some implementation-defined format
+* All other values: reserved
 
 [[cmd-r.csr]]
 ==== R.CSR
@@ -274,8 +271,6 @@ Read the 32-bit control and status register (<<reg-csr>>). This command has no s
 ==== W.CSR
 
 Write the 32-bit control and status register (<<reg-csr>>).
-
-`DISCONNECT` and `W.CSR` are the only side-effecting commmands the DTM will accept when an error flag is raised in the CSR.
 
 [[cmd-w.addr]]
 ==== W.ADDR
@@ -396,7 +391,7 @@ This table doesn't try to replace any of the standard discovery mechanisms that 
 
 The host should always start reading AINFO from <<reg-addr>> = 0, and continue until encountering an entry with `VALID` = 0, indicating the end of the table. The result of reading past the first invalid entry is undefined; there is no requirement for the DTM to decode all <<reg-addr>> bits for AINFO reads.
 
-If some debug agent is present (such as a RISC-V Debug Module), this must be the _first_ entry with its `PRESENT` bit set, usually at offset 0 in the table. There may be multiple debug agents present in the table, but being the first present entry should be considered a strong hint to the host that it should start here to perform further deeper discovery.
+If some debug agent is present (such as a RISC-V Debug Module), this must be the _first_ entry with its `PRESENT` bit set, usually at offset 0 in the table. There may be multiple debug agents present in the table, but being the first present entry should be considered a strong hint to the host that it should start here to perform deeper discovery.
 
 === AINFO Entry Format
 
