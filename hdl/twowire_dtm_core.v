@@ -328,7 +328,7 @@ assign bus_busy = psel;
 
 assign dst_psel = psel;
 assign dst_penable = penable;
-assign dst_pwrite = penable;
+assign dst_pwrite = pwrite;
 assign dst_paddr = bus_addr;
 assign dst_pwdata = bus_dbuf;
 
