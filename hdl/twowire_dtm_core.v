@@ -17,6 +17,7 @@ module twowire_dtm_core #(
 
 	input  wire                     connected,
 	output reg                      disconnect_now,
+	output wire [3:0]               mdropaddr,
 
 	// Serial interface
 	input  wire [W_CMD-1:0]         cmd,
@@ -197,9 +198,9 @@ always @ (*) begin
 		sreg_nxt = {sreg[W_SREG-2:0], 1'b0};
 		if (cmd_is_write) begin
 			if (cmd == CMD_W_ADDR) begin
-				sreg_nxt[W_SREG - (W_ADDR - 1)] = serial_wdata;
+				sreg_nxt[W_SREG - W_ADDR] = serial_wdata;
 			end else begin
-				sreg_nxt[W_SREG - 31] = serial_wdata;
+				sreg_nxt[W_SREG - 32] = serial_wdata;
 			end
 		end
 	end
@@ -223,6 +224,29 @@ always @ (posedge dck or negedge drst_n) begin
 end
 
 assign serial_rdata = sreg[W_SREG - 1];
+
+wire write_csr  = state == S_WRITE && cmd == CMD_W_CSR;
+wire write_addr = state == S_WRITE && cmd == CMD_W_ADDR;
+wire write_data = state == S_WRITE && cmd == CMD_W_DATA;
+
+// ----------------------------------------------------------------------------
+// CSR update
+
+wire [31:0] csr_wdata = byteswap_sreg(sreg);
+
+always @ (posedge dck or negedge drst_n) begin
+	if (!drst_n) begin
+		csr_mdropaddr <= 4'h0;
+	end else if (write_csr) begin
+		csr_mdropaddr <= csr_wdata[7:4];
+	end
+end
+
+assign mdropaddr = csr_mdropaddr;
+
+// ----------------------------------------------------------------------------
+// Bus interface
+
 
 endmodule
 

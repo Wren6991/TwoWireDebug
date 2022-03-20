@@ -62,7 +62,7 @@ twowire_dtm_io_flops io_flops_u (
 // ----------------------------------------------------------------------------
 // Connect sequence monitor
 
-wire [3:0] mdropaddr = 4'h00; // TODO driven from CSR
+wire [3:0] mdropaddr;
 
 wire connect_now;
 
@@ -141,6 +141,7 @@ twowire_dtm_core #(
 
 	.connected         (connected),
 	.disconnect_now    (disconnect_now),
+	.mdropaddr         (mdropaddr),
 
 	.cmd               (sercom_cmd),
 	.cmd_vld           (sercom_cmd_vld),

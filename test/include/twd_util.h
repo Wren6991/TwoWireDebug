@@ -4,6 +4,48 @@
 
 #include "tb.h"
 
+// ----------------------------------------------------------------------------
+// TWD constants
+
+typedef enum {
+	CMD_DISCONNECT = 0x0,
+	CMD_R_IDCODE = 0x1,
+	CMD_R_CSR = 0x2,
+	CMD_W_CSR = 0x3,
+	CMD_R_ADDR = 0x4,
+	CMD_W_ADDR = 0x5,
+	CMD_R_DATA = 0x7,
+	CMD_R_BUFF = 0x8,
+	CMD_W_DATA = 0x9
+} twd_cmd;
+
+static const uint8_t seq_connect_noaddr[] = {
+	// Sync LFSR
+	0x00,
+	// 64 bits of LFSR output
+	0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31,
+	// 72 1s
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+	// Then 4-bit address, followed by its complement
+};
+
+static const unsigned CSR_MDROPADDR_LSB  = 4;
+static const uint32_t CSR_MDROPADDR_BITS = 0x000000f0u;
+
+static inline uint32_t bytes_to_ule32(const uint8_t b[4]) {
+	return (uint32_t)b[3] << 24 | b[2] << 16 | b[1] << 8 | b[0];
+}
+
+static inline void ule32_to_bytes(uint32_t u, uint8_t b[4]) {
+	b[0] = u & 0xffu;
+	b[1] = u >> 8 & 0xffu;
+	b[2] = u >> 16 & 0xffu;
+	b[3] = u >> 24 & 0xffu;
+}
+
+// ----------------------------------------------------------------------------
+// Raw serial operations
+
 // MSB-first wire order.
 static inline void put_bits(tb &t, const uint8_t *tx, int n_bits) {
 	uint8_t shifter;
@@ -62,37 +104,14 @@ static inline void idle_clocks(tb &t, int n_bits) {
 	}
 }
 
-static const uint8_t seq_connect_noaddr[] = {
-	// Sync LFSR
-	0x00,
-	// 64 bits of LFSR output
-	0xa7, 0xa3, 0x92, 0xdd, 0x9a, 0xbf, 0x04, 0x31,
-	// 72 1s
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-	// Then 4-bit address, followed by its complement
-};
+// ----------------------------------------------------------------------------
+// DTM operations
 
 static inline void connect_target(tb &t, uint8_t addr) {
 	put_bits(t, seq_connect_noaddr, 144);
 	addr = (addr << 4) | (~addr & 0xfu);
 	put_bits(t, &addr, 8);
 }
-
-static inline uint32_t bytes_to_ule32(const uint8_t b[4]) {
-	return (uint32_t)b[3] << 24 | b[2] << 16 | b[1] << 8 | b[0];
-}
-
-typedef enum {
-	CMD_DISCONNECT = 0x0,
-	CMD_R_IDCODE = 0x1,
-	CMD_R_CSR = 0x2,
-	CMD_W_CSR = 0x3,
-	CMD_R_ADDR = 0x4,
-	CMD_W_ADDR = 0x5,
-	CMD_R_DATA = 0x7,
-	CMD_R_BUFF = 0x8,
-	CMD_W_DATA = 0x9
-} twd_cmd;
 
 static inline void send_command_byte(tb &t, twd_cmd cmd) {
 	uint8_t start_bit = 1;
@@ -138,4 +157,12 @@ bool read_csr(tb &t, uint32_t *csr) {
 	get_bits(t, csrbytes, 32);
 	*csr = bytes_to_ule32(csrbytes);
 	return check_parity_byte(t, csrbytes, 32);
+}
+
+void write_csr(tb &t, uint32_t csr) {
+	uint8_t csrbytes[4];
+	ule32_to_bytes(csr, csrbytes);
+	send_command_byte(t, CMD_W_CSR);
+	put_bits(t, csrbytes, 32);
+	send_parity_byte(t, csrbytes, 32);
 }
