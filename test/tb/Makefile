@@ -9,6 +9,7 @@ all: tb.o
 
 SYNTH_CMD += read_verilog $(HDL);
 SYNTH_CMD += chparam -set IDCODE 32'hdeadbeef $(TOP);
+SYNTH_CMD += chparam -set ASIZE  3            $(TOP);
 SYNTH_CMD += hierarchy -top $(TOP);
 SYNTH_CMD += write_cxxrtl dut.cpp;
 

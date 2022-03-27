@@ -195,6 +195,16 @@ void write_addr(tb &t, uint64_t addr, unsigned int asize) {
 	put_bits_with_parity(t, addr_bytes, 8 * (asize + 1));
 }
 
+uint64_t read_addr(tb &t, unsigned int asize) {
+	uint8_t addr_bytes[8] = {0};
+	send_command_byte(t, CMD_R_ADDR);
+	get_bits(t, addr_bytes, 8 * (asize + 1));
+	uint32_t a0 = bytes_to_ule32(&addr_bytes[0]);
+	uint32_t a1 = bytes_to_ule32(&addr_bytes[4]);
+	uint64_t addr = (uint64_t)a1 << 32 | a0;
+	return check_parity_byte(t, addr_bytes, 8 * (asize + 1)) ? addr : 0ull;
+}
+
 void write_data(tb &t, uint32_t data) {
 	uint8_t data_bytes[4];
 	ule32_to_bytes(data, data_bytes);
