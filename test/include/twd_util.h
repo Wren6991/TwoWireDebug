@@ -29,10 +29,24 @@ static const uint8_t seq_connect_noaddr[] = {
 	// Then 4-bit address, followed by its complement
 };
 
-static const unsigned CSR_MDROPADDR_LSB  = 4;
-static const uint32_t CSR_MDROPADDR_BITS = 0x000000f0u;
-static const unsigned CSR_ASIZE_LSB      = 24;
-static const uint32_t CSR_ASIZE_BITS     = 0x0f000000u;
+static const unsigned CSR_ASIZE_LSB         = 24;
+static const uint32_t CSR_ASIZE_BITS        = 0x07000000u;
+static const unsigned CSR_EPARITY_LSB       = 18;
+static const uint32_t CSR_EPARITY_BITS      = 0x00040000u;
+static const unsigned CSR_EBUSFAULT_LSB     = 17;
+static const uint32_t CSR_EBUSFAULT_BITS    = 0x00020000u;
+static const unsigned CSR_EBUSY_LSB         = 16;
+static const uint32_t CSR_EBUSY_BITS        = 0x00010000u;
+static const unsigned CSR_AINCR_LSB         = 12;
+static const uint32_t CSR_AINCR_BITS        = 0x00001000u;
+static const unsigned CSR_BUSY_LSB          = 8;
+static const uint32_t CSR_BUSY_BITS         = 0x00000100u;
+static const unsigned CSR_NDTMRESETACK_LSB  = 5;
+static const uint32_t CSR_NDTMRESETACK_BITS = 0x00000020u;
+static const unsigned CSR_NDTMRESET_LSB     = 4;
+static const uint32_t CSR_NDTMRESET_BITS    = 0x00000010u;
+static const unsigned CSR_MDROPADDR_LSB     = 0;
+static const uint32_t CSR_MDROPADDR_BITS    = 0x0000000fu;
 
 static inline uint32_t bytes_to_ule32(const uint8_t b[4]) {
 	return (uint32_t)b[3] << 24 | b[2] << 16 | b[1] << 8 | b[0];

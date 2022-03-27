@@ -12,29 +12,19 @@
 module twowire_dtm #(
 	// If IDCODE[0] == 1'b1, this is formatted as a JTAG IDCODE register.
 	// If all-zeroes, no identifier provided.
-	parameter IDCODE            = 32'h0,
+	parameter IDCODE    = 32'h0,
 
 	// Address size = 8 * (1 + ASIZE) bits. Maximum 64 bits.
-	parameter ASIZE             = 0,
+	parameter ASIZE     = 0,
 
-	// Support any/all of the possible DSIZE values. Must support at least one.
-	parameter SUPPORT_DSIZE_8B  = 0,
-	parameter SUPPORT_DSIZE_16B = 0,
-	parameter SUPPORT_DSIZE_32B = 1,
-	parameter SUPPORT_DSIZE_64B = 0,
+	// AINFO entry count and entries (including the VALID=0 entry at the end)
+	parameter N_AINFO   = 1,
+	// Listed highest-numbered entry first
+	parameter AINFO     = {N_AINFO{32'h0}},
 
-	// Driven parameters, do not modify:
-
-	parameter MAX_DSIZE = SUPPORT_DSIZE_64B ? 3 :
-	                      SUPPORT_DSIZE_32B ? 2 :
-	                      SUPPORT_DSIZE_16B ? 1 : 0,   // do not modify
-
-	// paddr is a byte address, and is scaled according to current DSIZE, so
-	// address width depends on max DSIZE as well as on ASIZE.
-
-	parameter W_ADDR    = 8 * (1 + ASIZE) + MAX_DSIZE, // do not modify
-
-	parameter W_DATA    = 8 << MAX_DSIZE               // do not modify
+	// Do not modify
+	parameter W_ADDR    = 8 * (1 + ASIZE), // do not modify
+	parameter W_DATA    = 32               // do not modify
 ) (
 	// Debug clock and debug reset
 	input  wire                     dck,
@@ -48,6 +38,9 @@ module twowire_dtm #(
 	// Status signals
 	output wire                     host_connected,
 
+	// Tie to 1'b0 if no AINFO is present
+	input  wire [N_AINFO-1:0]       ainfo_present,
+
 	// Downstream bus (APB3 ish)
 	output wire [W_ADDR-1:0]        dst_paddr,
 	output wire                     dst_psel,
@@ -55,8 +48,8 @@ module twowire_dtm #(
 	output wire                     dst_pwrite,
 	input  wire                     dst_pready,
 	input  wire                     dst_pslverr,
-	output wire [31:0]              dst_pwdata,
-	input  wire [31:0]              dst_prdata
+	output wire [W_DATA-1:0]        dst_pwdata,
+	input  wire [W_DATA-1:0]        dst_prdata
 );
 
 // ----------------------------------------------------------------------------

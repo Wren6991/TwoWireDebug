@@ -71,6 +71,7 @@ localparam CMD_W_ADDR     = 4'h5;
 localparam CMD_R_DATA     = 4'h7;
 localparam CMD_R_BUFF     = 4'h8;
 localparam CMD_W_DATA     = 4'h9;
+localparam CMD_R_AINFO    = 4'hb;
 
 wire cmd_is_write =
 	cmd == CMD_W_CSR ||
@@ -137,7 +138,7 @@ always @ (*) begin
 				TWD_VERSION,
 				1'b0,             // reserved
 				ASIZE[2:0],
-				1'b0,             // reserved
+				5'h00,             // reserved
 				errflag_parity,
 				errflag_busfault,
 				errflag_busy,
@@ -148,8 +149,7 @@ always @ (*) begin
 				2'h0,             // reserved
 				csr_ndtmresetack,
 				csr_ndtmreset,
-				csr_mdropaddr,
-				4'h0              // reserved
+				csr_mdropaddr
 			});
 		end
 		CMD_R_ADDR: begin
@@ -243,9 +243,9 @@ always @ (posedge dck or negedge drst_n) begin
 		csr_ndtmreset <= 1'b0;
 		csr_mdropaddr <= 4'h0;
 	end else if (write_csr) begin
-		csr_aincr <= csr_wdata[16];
-		csr_ndtmreset <= csr_wdata[8];
-		csr_mdropaddr <= csr_wdata[7:4];
+		csr_aincr <= csr_wdata[12];
+		csr_ndtmreset <= csr_wdata[4];
+		csr_mdropaddr <= csr_wdata[3:0];
 	end
 end
 
@@ -260,7 +260,7 @@ always @ (posedge dck or negedge drst_n) begin
 	end else begin
 		// Set by rising edge of ACK, cleared by writing to CSR.
 		ndtmresetack_prev <= ndtmresetack;
-		csr_ndtmresetack <= (csr_ndtmresetack && !(write_csr && csr_wdata[9])) ||
+		csr_ndtmresetack <= (csr_ndtmresetack && !(write_csr && csr_wdata[5])) ||
 			(ndtmresetack && !ndtmresetack_prev);
 	end
 end
@@ -275,11 +275,11 @@ always @ (posedge dck or negedge drst_n) begin
 		errflag_busfault <= 1'b0;
 	end else begin
 		errflag_parity <= (errflag_parity
-			&& !(write_csr && csr_wdata[22])) || serial_parity_err;
+			&& !(write_csr && csr_wdata[18])) || serial_parity_err;
 		errflag_busfault <= (errflag_busfault
-			&& !(write_csr && csr_wdata[21])) || set_errflag_busfault;
+			&& !(write_csr && csr_wdata[17])) || set_errflag_busfault;
 		errflag_busy <= (errflag_busy
-			&& !(write_csr && csr_wdata[20])) || set_errflag_busy;
+			&& !(write_csr && csr_wdata[16])) || set_errflag_busy;
 	end
 end
 
