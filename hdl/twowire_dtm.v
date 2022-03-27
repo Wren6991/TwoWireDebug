@@ -24,7 +24,6 @@ module twowire_dtm #(
 
 	// Do not modify
 	parameter W_ADDR    = 8 * (1 + ASIZE), // do not modify
-	parameter W_DATA    = 32               // do not modify
 ) (
 	// Debug clock and debug reset
 	input  wire                     dck,
@@ -38,7 +37,7 @@ module twowire_dtm #(
 	// Status signals
 	output wire                     host_connected,
 
-	// Tie to 1'b0 if no AINFO is present
+	// Address info present/nonpresent status, tie 1'b0 if unused
 	input  wire [N_AINFO-1:0]       ainfo_present,
 
 	// Downstream bus (APB3 ish)
@@ -48,8 +47,8 @@ module twowire_dtm #(
 	output wire                     dst_pwrite,
 	input  wire                     dst_pready,
 	input  wire                     dst_pslverr,
-	output wire [W_DATA-1:0]        dst_pwdata,
-	input  wire [W_DATA-1:0]        dst_prdata
+	output wire [31:0]              dst_pwdata,
+	input  wire [31:0]              dst_prdata
 );
 
 // ----------------------------------------------------------------------------
