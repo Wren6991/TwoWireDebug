@@ -114,7 +114,7 @@ void tb::step() {
 		}
 		else if (bus_wen && write_callback) {
 			last_write_response = write_callback(bus_addr, bus_wdata);
-			last_read_response.delay_cycles++;
+			last_write_response.delay_cycles++;
 			// if (last_write_response.delay_cycles == 0) {
 			// 	dtm->p_dst__pslverr.set<bool>(last_write_response.err);
 			// }
