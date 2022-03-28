@@ -37,6 +37,10 @@ module twowire_dtm #(
 	// Status signals
 	output wire                     host_connected,
 
+	// System reset request/acknowledge (externally synchronised!)
+	output wire                     ndtmresetreq,
+	input  wire                     ndtmresetack,
+
 	// Address info present/nonpresent status, tie 1'b0 if unused
 	input  wire [N_AINFO-1:0]       ainfo_present,
 
@@ -146,9 +150,11 @@ twowire_dtm_serial_comms #(
 // TDM core implementation
 
 twowire_dtm_core #(
-	.W_CMD  (W_CMD),
-	.ASIZE  (ASIZE),
-	.IDCODE (IDCODE)
+	.W_CMD   (W_CMD),
+	.ASIZE   (ASIZE),
+	.IDCODE  (IDCODE),
+	.N_AINFO (N_AINFO),
+	.AINFO   (AINFO)
 ) core_u (
 	.dck               (dck),
 	.drst_n            (drst_n),
@@ -166,6 +172,11 @@ twowire_dtm_core #(
 	.serial_wdata_vld  (sercom_wdata_vld),
 	.serial_rdata      (sercom_rdata),
 	.serial_rdata_rdy  (sercom_rdata_rdy),
+
+	.ndtmresetreq      (ndtmresetreq),
+	.ndtmresetack      (ndtmresetack),
+
+	.ainfo_present     (ainfo_present),
 
 	.dst_paddr         (dst_paddr),
 	.dst_psel          (dst_psel),

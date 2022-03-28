@@ -1,7 +1,7 @@
 #include "tb.h"
 #include "twd_util.h"
 
-// Check that write addresses/data make it to the bus interface
+// Check that AINCR causes ADDR to increment when a write transfer completes
 
 uint32_t write_data_func(uint64_t addr) {
 	return (addr & 0xffffffffu) | (addr * 3 >> 32 & 0xffffffffu);

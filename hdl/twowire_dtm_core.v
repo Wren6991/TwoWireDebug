@@ -8,9 +8,11 @@
 `default_nettype none
 
 module twowire_dtm_core #(
-	parameter W_CMD = 4,
-	parameter ASIZE = 0,
-	parameter IDCODE = 32'h00000000
+	parameter W_CMD   = 4,
+	parameter ASIZE   = 0,
+	parameter IDCODE  = 32'h00000000,
+	parameter N_AINFO = 1,
+	parameter AINFO   = {N_AINFO{32'h00000000}}
 ) (
 	input  wire                     dck,
 	input  wire                     drst_n,
@@ -34,6 +36,9 @@ module twowire_dtm_core #(
 	// Non-DTM reset request
 	output wire                     ndtmresetreq,
 	input  wire                     ndtmresetack,
+
+	// Address info present/nonpresent status
+	input  wire [N_AINFO-1:0]       ainfo_present,
 
 	// Downstream bus (APB3 ish)
 	output wire [8*(1 + ASIZE)-1:0] dst_paddr,
@@ -112,6 +117,7 @@ reg [W_SREG-1:0]  sreg;
 reg [W_SREG-1:0]  sreg_nxt;
 
 wire shift_en = cmd_is_write ? serial_wdata_vld : serial_rdata_rdy;
+reg [31:0] ainfo_rdata;
 
 always @ (*) begin
 	state_nxt = state;
@@ -184,6 +190,11 @@ always @ (*) begin
 			bit_ctr_nxt = 6'h1f;
 			state_nxt = S_SHIFT;
 		end
+		CMD_R_AINFO: begin
+			bit_ctr_nxt = 6'h1f;
+			state_nxt = S_SHIFT;
+			sreg_nxt = ainfo_rdata;
+		end
 		default: begin
 			disconnect_now = 1'b1;
 		end
@@ -229,8 +240,9 @@ wire write_csr  = state == S_WRITE && cmd == CMD_W_CSR;
 wire write_addr = state == S_WRITE && cmd == CMD_W_ADDR;
 wire write_data = state == S_WRITE && cmd == CMD_W_DATA;
 
-wire read_data = state == S_IDLE && cmd_vld && cmd == CMD_R_DATA;
-wire read_buff = state == S_IDLE && cmd_vld && cmd == CMD_R_BUFF;
+wire read_data  = state == S_IDLE && cmd_vld && cmd == CMD_R_DATA;
+wire read_buff  = state == S_IDLE && cmd_vld && cmd == CMD_R_BUFF;
+wire read_ainfo = state == S_IDLE && cmd_vld && cmd == CMD_R_AINFO;
 
 // ----------------------------------------------------------------------------
 // CSR update
@@ -284,6 +296,25 @@ always @ (posedge dck or negedge drst_n) begin
 end
 
 // ----------------------------------------------------------------------------
+// Address info table
+
+localparam W_AINFO_ADDR = N_AINFO > 1 ? $clog2(N_AINFO) : 1;
+
+always @ (*) begin: ainfo_rport
+	reg [W_AINFO_ADDR:0] i;
+	ainfo_rdata = 32'h0;
+	for (i = 0; i < N_AINFO; i = i + 1) begin
+		if (i[W_AINFO_ADDR-1:0] == bus_addr[W_AINFO_ADDR-1:0]) begin
+			ainfo_rdata = {
+				AINFO[32 * i + 2 +: 30],
+				ainfo_present[i],
+				AINFO[32 * i]
+			};
+		end
+	end
+end
+
+// ----------------------------------------------------------------------------
 // Bus interface
 
 reg psel;
@@ -320,6 +351,8 @@ always @ (posedge dck or negedge drst_n) begin
 		end else if (read_data) begin
 			psel <= 1'b1;
 			pwrite <= 1'b0;
+		end else if (read_ainfo && csr_aincr) begin
+			bus_addr <= bus_addr + 1'b1;
 		end
 	end
 end
@@ -335,7 +368,11 @@ assign dst_pwdata = bus_dbuf;
 assign set_errflag_busfault = dst_penable && dst_pready && dst_pslverr;
 
 assign set_errflag_busy = dst_psel && (
-	write_addr || write_data || read_data || read_buff
+	write_addr ||
+	write_data ||
+	read_data ||
+	read_buff ||
+	(read_ainfo && csr_aincr)
 );
 
 endmodule
