@@ -264,6 +264,8 @@ end
 
 assign mdropaddr = csr_mdropaddr;
 
+assign ndtmresetreq = csr_ndtmreset;
+
 reg ndtmresetack_prev;
 
 always @ (posedge dck or negedge drst_n) begin
