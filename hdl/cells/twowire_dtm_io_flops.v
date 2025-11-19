@@ -19,8 +19,8 @@ module twowire_dtm_io_flops (
 	input  wire dck,
 	input  wire drst_n,
 
-	input  wire do,
-	output wire do_q,
+	input  wire dout,
+	output wire dout_q,
 
 	input  wire doe,
 	output wire doe_q,
@@ -29,25 +29,25 @@ module twowire_dtm_io_flops (
 	output wire di_q
 );
 
-`TWOWIRE_REG_KEEP_ATTR reg do_reg;
+`TWOWIRE_REG_KEEP_ATTR reg dout_reg;
 `TWOWIRE_REG_KEEP_ATTR reg doe_reg;
 `TWOWIRE_REG_KEEP_ATTR reg di_reg;
 
 always @ (posedge dck or negedge drst_n) begin
 	if (!drst_n) begin
-		do_reg  <= 1'b0;
+		dout_reg  <= 1'b0;
 		doe_reg <= 1'b0;
 		di_reg  <= 1'b0;
 	end else begin
-		do_reg  <= do;
+		dout_reg  <= dout;
 		doe_reg <= doe;
 		di_reg  <= di;
 	end
 end
 
-assign do_q  = do_reg;
-assign doe_q = doe_reg;
-assign di_q  = di_reg;
+assign dout_q = dout_reg;
+assign doe_q  = doe_reg;
+assign di_q   = di_reg;
 
 endmodule
 

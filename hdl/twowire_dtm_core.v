@@ -122,6 +122,7 @@ reg [31:0] ainfo_rdata;
 always @ (*) begin
 	state_nxt = state;
 	bit_ctr_nxt = bit_ctr;
+	sreg_nxt = sreg;
 
 	disconnect_now = 1'b0;
 	cmd_payload_end = 1'b0;

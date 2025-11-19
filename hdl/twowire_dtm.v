@@ -23,14 +23,14 @@ module twowire_dtm #(
 	parameter AINFO     = {N_AINFO{32'h0}},
 
 	// Do not modify
-	parameter W_ADDR    = 8 * (1 + ASIZE), // do not modify
+	parameter W_ADDR    = 8 * (1 + ASIZE) // do not modify
 ) (
 	// Debug clock and debug reset
 	input  wire                     dck,
 	input  wire                     drst_n,
 
 	// DIO pad connections
-	output wire                     do,
+	output wire                     dout,
 	output wire                     doe,
 	input  wire                     di,
 
@@ -59,7 +59,7 @@ module twowire_dtm #(
 // IO registers
 
 // No logic between IO registers and the pad.
-wire do_nxt;
+wire dout_nxt;
 wire doe_nxt;
 wire di_q;
 
@@ -67,8 +67,8 @@ twowire_dtm_io_flops io_flops_u (
 	.dck    (dck),
 	.drst_n (drst_n),
 
-	.do     (do_nxt),
-	.do_q   (do),
+	.dout   (dout_nxt),
+	.dout_q (dout),
 
 	.doe    (doe_nxt),
 	.doe_q  (doe),
@@ -129,7 +129,7 @@ twowire_dtm_serial_comms #(
 	.drst_n          (drst_n),
 
 	.di_q            (di_q),
-	.do_nxt          (do_nxt),
+	.dout_nxt        (dout_nxt),
 	.doe_nxt         (doe_nxt),
 
 	.connected       (connected),

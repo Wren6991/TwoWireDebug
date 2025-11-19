@@ -18,7 +18,7 @@ module twowire_dtm_serial_comms #(
 	input  wire             drst_n,
 
 	input  wire             di_q,
-	output reg              do_nxt,
+	output reg              dout_nxt,
 	output reg              doe_nxt,
 
 	input  wire             connected,
@@ -77,7 +77,7 @@ always @ (*) begin
 	parity_nxt = 1'b1;
 
 	doe_nxt = 1'b0;
-	do_nxt = 1'b0;
+	dout_nxt = 1'b0;
 
 	cmd_vld = 1'b0;
 	parity_err = 1'b0;
@@ -133,7 +133,7 @@ always @ (*) begin
 		end else begin
 			rdata_rdy = 1'b1;
 			doe_nxt = 1'b1;
-			do_nxt = rdata;
+			dout_nxt = rdata;
 			parity_nxt = parity ^ rdata;
 		end
 		if (cmd_payload_end) begin
@@ -150,7 +150,7 @@ always @ (*) begin
 			end
 		end else begin
 			doe_nxt = 1'b1;
-			do_nxt = parity;
+			dout_nxt = parity;
 			state_nxt = S_PARITY1;
 		end
 	end
@@ -158,7 +158,7 @@ always @ (*) begin
 		if (!cmd_is_write) begin
 			// Park DIO for turnaround
 			doe_nxt = 1'b1;
-			do_nxt = 1'b0;
+			dout_nxt = 1'b0;
 		end
 		state_nxt = S_PARITY2;
 	end
@@ -174,7 +174,7 @@ always @ (*) begin
 		// Override previous assignments. Force serial unit back to idle state.
 		state_nxt = S_IDLE;
 		doe_nxt = 1'b0;
-		do_nxt = 1'b0;
+		dout_nxt = 1'b0;
 	end
 end
 
