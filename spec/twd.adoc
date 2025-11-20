@@ -72,7 +72,7 @@ image::img/cmd_byte_fmt.png[pdfwidth=100%,align=center]
 
 A command byte consists of:
 
-* A leading 1 start bit
+* A leading 1 start bit (the MSB)
 * A 4-bit command code
 * An odd parity bit
 * Two turnaround bits

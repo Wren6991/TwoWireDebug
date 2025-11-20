@@ -83,6 +83,7 @@ twowire_dtm_io_flops io_flops_u (
 wire [3:0] mdropaddr;
 
 wire connect_now;
+reg connected;
 
 twowire_dtm_connect_monitor connect_monitor_u (
 	.dck         (dck),
@@ -93,7 +94,6 @@ twowire_dtm_connect_monitor connect_monitor_u (
 	.connected   (connected)
 );
 
-reg connected;
 assign host_connected = connected;
 
 wire disconnect_now;
