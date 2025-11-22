@@ -77,6 +77,7 @@ localparam CMD_R_DATA     = 4'h7;
 localparam CMD_R_BUFF     = 4'h8;
 localparam CMD_W_DATA     = 4'h9;
 localparam CMD_R_AINFO    = 4'hb;
+localparam CMD_R_STAT     = 4'hd;
 
 wire cmd_is_write =
 	cmd == CMD_W_CSR ||
@@ -157,6 +158,17 @@ always @ (*) begin
 				csr_ndtmresetack,
 				csr_ndtmreset,
 				csr_mdropaddr
+			});
+		end
+		CMD_R_STAT: begin
+			bit_ctr_nxt = 6'h03;
+			state_nxt = S_SHIFT;
+			sreg_nxt = byteswap_sreg({
+				errflag_parity,
+				errflag_busfault,
+				errflag_busy,
+				bus_busy,
+				4'd0
 			});
 		end
 		CMD_R_ADDR: begin

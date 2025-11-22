@@ -20,20 +20,21 @@ This specification defines:
 .A Two-Wire Debug system. The host uses the DCK and DIO signals to communicate with the DTM. From there, the host can access the target's internal debug hardware.
 image::img/twd_system.drawio.png[pdfwidth=40%,align=center]
 
-Throughout this document, _target_ refers to the device under test -- an integrated system with a single DTM, some address-mapped debug components on a bus downstream of the DTM, and presumably an actual system to be debugged -- and _host_ refers to the system communicating with and commanding the DTM, e.g. a developer's laptop and a USB debug probe.
-
-The downstream bus supports 32-bit aligned reads and writes, with a fixed address width between 8 and 64 bits. Further details of the bus are implementation-defined, and should be invisible to the DTM. Any address-mapped hardware could be attached, such as: a RISC-V Debug Module, CoreSight Access Ports, or direct system bus access.
+Throughout this document, _target_ refers to the device under test: an integrated system with a single DTM, some address-mapped debug components on a bus downstream of the DTM, and presumably some other hardware to be debugged. Conversely, _host_ refers to the system communicating with and commanding the DTM, e.g. a developer's laptop and a USB debug probe.
 
 Features of TWD:
 
-* Two wires: DCK (debug clock) and DIO (debug serial data in/out)
-** Both with mandatory pull-down resistors
-* Supports 32-bit read/writes on an 8- to 64-bit address space
-* Commands break down into bytes, for simple SPI host support
-* All errors are accumulative
-** Transfers don't have a response phase; errors are explicitly polled after a command batch
-** An error causes the DTM to ignore further commands until the error is checked and cleared
-* Multidrop bus, with a standard method of setting 4-bit multidrop address
+* Two wires: DCK (debug clock) and DIO (debug serial data in/out).
+** Both with mandatory pull-down resistors.
+* Supports 32-bit read/writes on an 8- to 64-bit address space.
+* Commands break down into bytes, for simple SPI host support.
+* All errors are accumulative.
+** Transfers don't have a response phase; errors are explicitly polled after a command batch.
+** An error causes the DTM to ignore further commands until the error is checked and cleared.
+** An abbreviated status read <<cmd-r.stat>> makes status polling more efficient for simple hosts.
+* Multidrop bus, with a standard method of setting 4-bit multidrop address.
+
+The downstream bus supports 32-bit aligned reads and writes. The address width is a multiple of 8 bits, between 8 and 64. All other details are implementation-defined. Any hardware can be attached, such as: a RISC-V Debug Module, CoreSight Access Ports, or direct system bus access.
 
 Two-Wire Debug is an open specification.
 
@@ -228,6 +229,7 @@ Summary of commands:
 |`0x8` |<<cmd-r.buff>>    | Get result of last `R.DATA`                        | 4 bytes read
 |`0x9` |<<cmd-w.data>>    | Perform bus write                                  | 4 bytes write
 |`0xb` |<<cmd-r.ainfo>>   | Read the <<address-info-table>>                    | 4 bytes read
+|`0xd` |<<cmd-r.stat>>    | Read abbreviated status                            | 1 byte combined read + parity
 |Others|Reserved          | Host should never issue. Target should Disconnect. |
 
 |===
@@ -271,6 +273,22 @@ Read the 32-bit control and status register (<<reg-csr>>). This command has no s
 ==== W.CSR
 
 Write the 32-bit control and status register (<<reg-csr>>).
+
+[[cmd-r.stat]]
+==== R.STAT
+
+Returns a short response containing just the error and status flags from the CSR, in a single byte. This improves performance for simple hosts that do not implement and prefer to poll after every transfer.
+
+The response is abbreviated, consisting of four flags followed by a parity bit, a stop bit and two turnaround bits (the non-optional part of a parity byte).
+
+In serial wire order the flags are:
+
+* `EPARITY` (MSB)
+* `EBUSFAULT`
+* `EBUSY`
+* `BUSY` (LSB)
+
+This is effectively a four-bit payload followed by a parity byte. Since the last four bits of the parity byte are optional, this does not break the overall byte-aligned structure of TWD.
 
 [[cmd-w.addr]]
 ==== W.ADDR
