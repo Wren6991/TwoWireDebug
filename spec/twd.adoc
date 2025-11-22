@@ -412,9 +412,3 @@ If some debug agent is present (such as a RISC-V Debug Module), this must be the
 include::ainfo_types.adoc[]
 
 To add a type to this list, raise a pull request on https://github.com/Wren6991/TwoWireDebug/blob/master/spec/ainfo_types.adoc[spec/ainfo_types.adoc on Github].
-
-== TODOs
-
-* Being able to observe ADDR during a bus cycle implies a shift register large enough to hold ADDR, and separate from it. Maybe this should raise a BUSY condition and return garbage.
-** More implementation work to see if this is possible/sensible.
-* Expand parity byte to a full byte, with e.g. CRC5?
