@@ -277,7 +277,7 @@ Write the 32-bit control and status register (<<reg-csr>>).
 [[cmd-r.stat]]
 ==== R.STAT
 
-Returns a short response containing just the error and status flags from the CSR, in a single byte. This improves performance for simple hosts that do not implement and prefer to poll after every transfer.
+Returns a short response containing just the error and status flags from the CSR, in a single byte. This improves performance for simple hosts that do not implement batching and prefer to poll after every transfer.
 
 The response is abbreviated, consisting of four flags followed by a parity bit, a stop bit and two turnaround bits (the non-optional part of a parity byte).
 
