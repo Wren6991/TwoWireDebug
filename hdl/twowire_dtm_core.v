@@ -67,21 +67,25 @@ end endfunction
 
 // ----------------------------------------------------------------------------
 
-localparam CMD_DISCONNECT = 4'h0;
-localparam CMD_R_IDCODE   = 4'h1;
-localparam CMD_R_CSR      = 4'h2;
-localparam CMD_W_CSR      = 4'h3;
-localparam CMD_R_ADDR     = 4'h4;
-localparam CMD_W_ADDR     = 4'h5;
-localparam CMD_R_DATA     = 4'h7;
-localparam CMD_R_BUFF     = 4'h8;
-localparam CMD_W_DATA     = 4'h9;
-localparam CMD_R_AINFO    = 4'hb;
-localparam CMD_R_STAT     = 4'hd;
+// Note all read commands have a parity bit of 0 (have an odd number of set
+// bits) as the parity bit is used to park DIO before bus turnaround.
+localparam [3:0] CMD_DISCONNECT = 4'h0;
+localparam [3:0] CMD_R_IDCODE   = 4'h1;
+localparam [3:0] CMD_R_AINFO    = 4'h2;
+localparam [3:0] CMD_R_STAT     = 4'h4;
+localparam [3:0] CMD_W_CSR      = 4'h6;
+localparam [3:0] CMD_R_CSR      = 4'h7;
+localparam [3:0] CMD_R_ADDR     = 4'h8;
+localparam [3:0] CMD_W_ADDR     = 4'h9;
+localparam [3:0] CMD_W_ADDR_R   = 4'ha;
+localparam [3:0] CMD_R_DATA     = 4'hb;
+localparam [3:0] CMD_W_DATA     = 4'hc;
+localparam [3:0] CMD_R_BUFF     = 4'hd;
 
 wire cmd_is_write =
 	cmd == CMD_W_CSR ||
 	cmd == CMD_W_ADDR ||
+	cmd == CMD_W_ADDR_R ||
 	cmd == CMD_W_DATA;
 
 // ----------------------------------------------------------------------------

@@ -221,15 +221,16 @@ Summary of commands:
 
 |`0x0` |<<cmd-disconnect>>| Enter the Disconnected state                       | None
 |`0x1` |<<cmd-r.idcode>>  | Read device identifier                             | 4 bytes read
-|`0x2` |<<cmd-r.csr>>     | Read control/status register                       | 4 bytes read
-|`0x3` |<<cmd-w.csr>>     | Write control/status register                      | 4 bytes write
-|`0x4` |<<cmd-r.addr>>    | Read address register                              | 1-8 bytes read
-|`0x5` |<<cmd-w.addr>>    | Write address register                             | 1-8 bytes write
-|`0x7` |<<cmd-r.data>>    | Perform bus read, and get result of last `R.DATA`  | 4 bytes read
-|`0x8` |<<cmd-r.buff>>    | Get result of last `R.DATA`                        | 4 bytes read
-|`0x9` |<<cmd-w.data>>    | Perform bus write                                  | 4 bytes write
-|`0xb` |<<cmd-r.ainfo>>   | Read the <<address-info-table>>                    | 4 bytes read
-|`0xd` |<<cmd-r.stat>>    | Read abbreviated status                            | 1 byte combined read + parity
+|`0x2` |<<cmd-r.ainfo>>   | Read the <<address-info-table>>                    | 4 bytes read
+|`0x4` |<<cmd-r.stat>>    | Read abbreviated status                            | 1 byte combined read + parity
+|`0x6` |<<cmd-w.csr>>     | Write control/status register                      | 4 bytes write
+|`0x7` |<<cmd-r.csr>>     | Read control/status register                       | 4 bytes read
+|`0x8` |<<cmd-r.addr>>    | Read address register                              | 1-8 bytes read
+|`0x9` |<<cmd-w.addr>>    | Write address register                             | 1-8 bytes write
+|`0xa` |<<cmd-w.addr.r>>  | Write address register and perform bus read        | 1-8 bytes write
+|`0xb` |<<cmd-r.data>>    | Perform bus read, and get result of last bus read  | 4 bytes read
+|`0xc` |<<cmd-w.data>>    | Perform bus write                                  | 4 bytes write
+|`0xd` |<<cmd-r.buff>>    | Get result of last bus rad                         | 4 bytes read
 |Others|Reserved          | Host should never issue. Target should Disconnect. |
 
 |===
@@ -298,6 +299,15 @@ Write to the address register (<<reg-addr>>). The size of the address register i
 For random accesses, a `W.ADDR` must be issued before each `W.DATA` or `R.DATA`. For sequential access to incrementing addresses, or repeated access to the same address, this is unnecessary, and multiple bus accesses can be performed without any intervening address register writes.
 
 If any error flag is set in the <<reg-csr>>, `W.ADDR` is ignored. If a downstream bus access is still in progress at the point a `W.ADDR` is issued, the <<reg-csr>>.`EBUSY` flag is set, and <<reg-addr>> is not written.
+
+[[cmd-w.addr]]
+==== W.ADDR.R
+
+Write to the address register, like <<cmd-w.addr>>. After writing to the address register, initiate a bus read from the written address.
+
+This command avoids an unnecessary data transfer at the beginning of a linear sequence of `R.DATA` commands, and improves the throughput of random read accesses.
+
+If any error flag is set in the <<reg-csr>>, `W.ADDR.R` is ignored. If a downstream bus access is still in progress at the point a `W.ADDR.R` is issued, the <<reg-csr>>.`EBUSY` flag is set, and <<reg-addr>> is not written.
 
 [[cmd-r.addr]]
 ==== R.ADDR

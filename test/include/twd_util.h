@@ -8,15 +8,18 @@
 // TWD constants
 
 typedef enum {
-	CMD_DISCONNECT = 0x0,
-	CMD_R_IDCODE = 0x1,
-	CMD_R_CSR = 0x2,
-	CMD_W_CSR = 0x3,
-	CMD_R_ADDR = 0x4,
-	CMD_W_ADDR = 0x5,
-	CMD_R_DATA = 0x7,
-	CMD_R_BUFF = 0x8,
-	CMD_W_DATA = 0x9
+	CMD_DISCONNECT = 0x0, // Enter Disconnected state
+	CMD_R_IDCODE   = 0x1, // Read IDCODE register
+	CMD_R_AINFO    = 0x2, // Read AINFO table, indexed by ADDR
+	CMD_R_STAT     = 0x4, // Read abbreviated status flags from CSR
+	CMD_W_CSR      = 0x6, // Write CSR
+	CMD_R_CSR      = 0x7, // Read CSR
+	CMD_R_ADDR     = 0x8, // Read address register
+	CMD_W_ADDR     = 0x9, // Write address register
+	CMD_W_ADDR_R   = 0xa, // Write address register and initiate downstream bus read
+	CMD_R_DATA     = 0xb, // Initiate downstream bus read and return data from previous read
+	CMD_W_DATA     = 0xc, // Initiate downstream bus write
+	CMD_R_BUFF     = 0xd, // Return data from previous downstream bus read
 } twd_cmd;
 
 static const uint8_t seq_connect_noaddr[] = {
