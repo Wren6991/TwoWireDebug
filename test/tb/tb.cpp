@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "dut.cpp"
-#include <backends/cxxrtl/cxxrtl_vcd.h>
+#include <cxxrtl/cxxrtl_vcd.h>
 
 tb::tb(std::string vcdfile) {
 	// Raw pointer... CXXRTL doesn't give us the type declaration wihout also
@@ -15,7 +15,7 @@ tb::tb(std::string vcdfile) {
  
 	waves_fd.open(vcdfile);
 	cxxrtl::debug_items all_debug_items;
-	dtm->debug_info(all_debug_items);
+	dtm->debug_info(&all_debug_items, /*scopes=*/nullptr, "");
 	vcd.timescale(1, "us");
 	vcd.add(all_debug_items);
 	vcd_sample = 0;
@@ -55,7 +55,7 @@ void tb::set_di(bool di) {
 bool tb::get_do() {
 	// Pulldown on bus, so return 0 if pin tristated.
 	return static_cast<cxxrtl_design::p_twowire__dtm*>(dut)->p_doe.get<bool>() ?
-		static_cast<cxxrtl_design::p_twowire__dtm*>(dut)->p_do.get<bool>() : false;
+		static_cast<cxxrtl_design::p_twowire__dtm*>(dut)->p_dout.get<bool>() : false;
 }
 
 bool tb::get_stat_connected() {

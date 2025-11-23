@@ -2,7 +2,7 @@ TESTCASES := $(wildcard *.cpp)
 TEST_EXCECS := $(addprefix build/,$(patsubst %.cpp,%,$(TESTCASES)))
 TESTS_RUN := $(addprefix run.,$(patsubst %.cpp,%,$(TESTCASES)))
 
-INCDIR := $(shell yosys-config --datdir)/include ../include
+INCDIR := $(shell yosys-config --datdir)/include/backends/cxxrtl/runtime ../include
 
 .PHONY: all clean
 .SECONDARY:

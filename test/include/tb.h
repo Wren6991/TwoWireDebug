@@ -3,8 +3,8 @@
 #include <string>
 #include <cstdint>
 #include <fstream>
-#include <backends/cxxrtl/cxxrtl.h>
-#include <backends/cxxrtl/cxxrtl_vcd.h>
+#include <cxxrtl/cxxrtl.h>
+#include <cxxrtl/cxxrtl_vcd.h>
 
 struct bus_read_response {
 	uint32_t data;

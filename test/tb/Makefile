@@ -1,7 +1,7 @@
 HDL = $(shell find ../.. -name "*.v")
 TOP = twowire_dtm
 
-INCDIR := $(shell yosys-config --datdir)/include ../include
+INCDIR := $(shell yosys-config --datdir)/include/backends/cxxrtl/runtime ../include
 
 .PHONY: clean all
 
