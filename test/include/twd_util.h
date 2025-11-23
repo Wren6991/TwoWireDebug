@@ -198,6 +198,14 @@ void write_addr(tb &t, uint64_t addr, unsigned int asize) {
 	put_bits_with_parity(t, addr_bytes, 8 * (asize + 1));
 }
 
+void write_addr_trigger_read(tb &t, uint64_t addr, unsigned int asize) {
+	uint8_t addr_bytes[8];
+	ule32_to_bytes(addr, &addr_bytes[0]);
+	ule32_to_bytes(addr >> 32, &addr_bytes[4]);
+	send_command_byte(t, CMD_W_ADDR_R);
+	put_bits_with_parity(t, addr_bytes, 8 * (asize + 1));
+}
+
 uint64_t read_addr(tb &t, unsigned int asize) {
 	uint8_t addr_bytes[8] = {0};
 	send_command_byte(t, CMD_R_ADDR);

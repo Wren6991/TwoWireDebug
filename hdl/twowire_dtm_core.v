@@ -194,8 +194,11 @@ always @ (*) begin
 			bit_ctr_nxt = 6'h1f;
 			state_nxt = S_SHIFT;
 		end
-
 		CMD_W_ADDR: begin
+			bit_ctr_nxt = W_ADDR - 1;
+			state_nxt = S_SHIFT;
+		end
+		CMD_W_ADDR_R: begin
 			bit_ctr_nxt = W_ADDR - 1;
 			state_nxt = S_SHIFT;
 		end
@@ -254,10 +257,13 @@ end
 assign serial_rdata = sreg[W_SREG - 1];
 
 wire write_csr  = state == S_WRITE && cmd == CMD_W_CSR;
-wire write_addr = state == S_WRITE && cmd == CMD_W_ADDR;
+wire write_addr = state == S_WRITE && (cmd == CMD_W_ADDR || cmd == CMD_W_ADDR_R);
 wire write_data = state == S_WRITE && cmd == CMD_W_DATA;
 
-wire read_data  = state == S_IDLE && cmd_vld && cmd == CMD_R_DATA;
+wire read_data  =
+	(state == S_IDLE && cmd_vld && cmd == CMD_R_DATA) ||
+	(state == S_WRITE && cmd == CMD_W_ADDR_R);
+
 wire read_buff  = state == S_IDLE && cmd_vld && cmd == CMD_R_BUFF;
 wire read_ainfo = state == S_IDLE && cmd_vld && cmd == CMD_R_AINFO;
 
@@ -363,7 +369,8 @@ always @ (posedge dck or negedge drst_n) begin
 	end else if (!errflag_any) begin
 		if (write_addr) begin
 			bus_addr <= byteswap_sreg(sreg);
-		end else if (write_data) begin
+		end
+		if (write_data) begin
 			psel <= 1'b1;
 			pwrite <= 1'b1;
 			bus_dbuf <= byteswap_sreg(sreg);
