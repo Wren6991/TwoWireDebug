@@ -228,7 +228,7 @@ always @ (*) begin
 		end
 		sreg_nxt = {sreg[W_SREG-2:0], 1'b0};
 		if (cmd_is_write) begin
-			if (cmd == CMD_W_ADDR) begin
+			if (cmd == CMD_W_ADDR || cmd == CMD_W_ADDR_R) begin
 				sreg_nxt[W_SREG - W_ADDR] = serial_wdata;
 			end else begin
 				sreg_nxt[W_SREG - 32] = serial_wdata;
