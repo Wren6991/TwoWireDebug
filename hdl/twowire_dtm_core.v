@@ -202,10 +202,6 @@ always @ (*) begin
 			bit_ctr_nxt = W_ADDR - 1;
 			state_nxt = S_SHIFT;
 		end
-		CMD_W_CSR: begin
-			bit_ctr_nxt = 6'h1f;
-			state_nxt = S_SHIFT;
-		end
 		CMD_W_DATA: begin
 			bit_ctr_nxt = 6'h1f;
 			state_nxt = S_SHIFT;
@@ -238,6 +234,10 @@ always @ (*) begin
 	S_WRITE: begin
 		state_nxt = S_IDLE;
 		// Update logic is outside of this state machine.
+	end
+	default: begin
+		// Should be unreachable but lint complains about incomplete case
+		state_nxt = S_IDLE;
 	end
 	endcase
 end
